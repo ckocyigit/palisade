@@ -440,34 +440,53 @@ export class ServersService implements OnApplicationBootstrap {
     }
   }
 
-  async stop(id: string, opts: { snapshot?: boolean } = {}): Promise<void> {
-    return this.withLock(id, () => this.doStop(id, opts));
+  /**
+   * Validate + move to Stopping synchronously (so the caller gets a fast 200 or a
+   * 400), then run the actual save + graceful shutdown in the BACKGROUND under the
+   * lock. The shutdown can take a while (the world save on exit), and the realtime
+   * badge tracks Stopping -> Stopped — so the HTTP request must not block on it,
+   * which is what caused the request to hang/500.
+   */
+  async stop(id: string, _opts: { snapshot?: boolean } = {}): Promise<void> {
+    // Serialize with any in-flight lifecycle op on this server (same as withLock).
+    while (this.locks.has(id)) await this.locks.get(id);
+    let release!: () => void;
+    const held = new Promise<void>((r) => (release = r));
+    this.locks.set(id, held);
+    void held.finally(() => this.locks.delete(id));
+    try {
+      const server = await this.prisma.server.findUnique({ where: { id } });
+      if (!server) throw new NotFoundException("Server not found");
+      const state = server.state as ServerState;
+      if (![ServerState.Running, ServerState.Starting].includes(state)) {
+        throw new BadRequestException(`Cannot stop from state ${state}`);
+      }
+      await this.sm.transition(id, ServerState.Stopping);
+      // Background teardown; holds the lock (so a follow-on start/restart waits for
+      // it) and releases on completion.
+      void this.tearDownStopped(id, server.containerId).finally(() => release());
+    } catch (err) {
+      release();
+      throw err;
+    }
   }
 
-  private async doStop(id: string, _opts: { snapshot?: boolean }): Promise<void> {
-    const server = await this.prisma.server.findUnique({ where: { id } });
-    if (!server) throw new NotFoundException("Server not found");
-    const state = server.state as ServerState;
-    if (![ServerState.Running, ServerState.Starting].includes(state)) {
-      throw new BadRequestException(`Cannot stop from state ${state}`);
-    }
-
-    await this.sm.transition(id, ServerState.Stopping);
-    // Graceful: save the world and WAIT for the save to finish, then ask the
-    // server to exit, before SIGTERM. A failed/stuck save is logged but doesn't
-    // block the stop (the exit + SIGTERM grace still let the server save again).
-    await this.rcon
-      .saveAndWait(id)
-      .catch((e) => this.logger.warn(`Save before stopping ${id} failed: ${(e as Error).message}`));
+  /** The actual shutdown, run detached from the HTTP request. */
+  private async tearDownStopped(id: string, containerId: string | null): Promise<void> {
+    // Best-effort explicit save (shows in the log). The authoritative save is the
+    // graceful shutdown below: SIGTERM makes POK/hermsi save the world before the
+    // server process exits, and docker.stop waits for that to finish.
+    await this.rcon.saveWorld(id).catch(() => undefined);
     await this.rcon.doExit(id).catch(() => undefined);
     await this.rcon.disconnect(id);
 
     this.logStops.get(id)?.();
     this.logStops.delete(id);
-    if (server.containerId) await this.docker.stop(server.containerId, 60).catch(() => undefined);
+    // Generous grace so a large world's save-on-exit isn't force-killed.
+    if (containerId) await this.docker.stop(containerId, 180).catch(() => undefined);
     await this.docker.removeByServerId(id).catch(() => undefined);
-    await this.prisma.server.update({ where: { id }, data: { containerId: null } });
-    await this.sm.transition(id, ServerState.Stopped);
+    await this.prisma.server.update({ where: { id }, data: { containerId: null } }).catch(() => undefined);
+    await this.sm.transition(id, ServerState.Stopped).catch(() => undefined);
   }
 
   async restart(id: string): Promise<void> {
