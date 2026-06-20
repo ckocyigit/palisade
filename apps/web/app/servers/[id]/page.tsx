@@ -1,9 +1,9 @@
 "use client";
 import { use, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Play, Square, RotateCw, Download, Loader2 } from "lucide-react";
+import { ArrowLeft, Play, Square, RotateCw, Download, Loader2, Pencil, Check, X } from "lucide-react";
 import { mapLabel, ServerState, type ServerSummary, type ServerConfigValues } from "@ark/shared";
-import { apiGet, apiPost } from "@/lib/api";
+import { apiGet, apiPost, apiPatch } from "@/lib/api";
 import { useRealtime } from "@/lib/socket";
 import { StateBadge } from "@/components/state-badge";
 import { ConnectCommand } from "@/components/connect-command";
@@ -26,6 +26,9 @@ export default function ServerDetailPage({ params }: { params: Promise<{ id: str
   const [configKey, setConfigKey] = useState(0); // bump to remount the editor on copy-in
   const [tab, setTab] = useState<Tab>("Overview");
   const [pending, setPending] = useState<"install" | "start" | "stop" | "restart" | null>(null);
+  const [renaming, setRenaming] = useState(false);
+  const [nameDraft, setNameDraft] = useState("");
+  const [savingName, setSavingName] = useState(false);
 
   // Keep the active tab in the URL (?tab=settings) so a refresh lands you back
   // on the same tab instead of Overview. Uses replaceState — no scroll/navigation.
@@ -66,6 +69,28 @@ export default function ServerDetailPage({ params }: { params: Promise<{ id: str
     if (msg.serverId === id && (msg.topic === "server.state" || msg.topic === "event")) refresh();
   }, id);
 
+  const startRename = () => {
+    if (server) setNameDraft(server.name);
+    setRenaming(true);
+  };
+  const saveName = async () => {
+    const next = nameDraft.trim();
+    if (!next || next === server?.name) {
+      setRenaming(false);
+      return;
+    }
+    setSavingName(true);
+    try {
+      await apiPatch(`/servers/${id}`, { name: next });
+      await refresh();
+      setRenaming(false);
+    } catch (e) {
+      alert((e as Error).message);
+    } finally {
+      setSavingName(false);
+    }
+  };
+
   const act = async (action: "install" | "start" | "stop" | "restart") => {
     setPending(action);
     try {
@@ -100,7 +125,38 @@ export default function ServerDetailPage({ params }: { params: Promise<{ id: str
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-semibold">{server.name}</h1>
+          {renaming ? (
+            <div className="flex items-center gap-2">
+              <input
+                autoFocus
+                className="input py-1 text-2xl font-semibold"
+                value={nameDraft}
+                onChange={(e) => setNameDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") void saveName();
+                  if (e.key === "Escape") setRenaming(false);
+                }}
+                disabled={savingName}
+              />
+              <button className="btn-primary" onClick={() => void saveName()} disabled={savingName} title="Save name">
+                {savingName ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+              </button>
+              <button className="btn-secondary" onClick={() => setRenaming(false)} disabled={savingName} title="Cancel">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          ) : (
+            <>
+              <h1 className="text-2xl font-semibold">{server.name}</h1>
+              <button
+                onClick={startRename}
+                className="text-slate-400 hover:text-slate-200"
+                title="Rename server"
+              >
+                <Pencil className="h-4 w-4" />
+              </button>
+            </>
+          )}
           <StateBadge state={server.state} />
         </div>
         <div className="flex flex-wrap gap-2">

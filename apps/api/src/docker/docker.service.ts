@@ -137,6 +137,12 @@ export class DockerService {
     }
   }
 
+  /** Rename a container in place (so the Unraid dashboard + bridge RCON host
+   *  track a server rename without a restart). Cosmetic — matched by label. */
+  async rename(id: string, name: string): Promise<void> {
+    await this.docker.getContainer(id).rename({ name });
+  }
+
   /** Remove a server's container(s) by the ark.serverId label — robust to the
    *  container's (now human-readable, renameable) name. */
   async removeByServerId(serverId: string, force = true): Promise<void> {

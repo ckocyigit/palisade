@@ -32,6 +32,7 @@ import { ManagerSettingsService } from "../manager-settings/manager-settings.ser
 import { buildContainerSpec } from "./runtime-spec";
 import { derivePorts, nextBasePort } from "../catalog/ports";
 import { LocalPaths } from "../common/paths";
+import { containerName } from "../common/naming";
 import { IMAGES, SERVER_UID, SERVER_GID } from "../common/images";
 import { loadEnv } from "../config/env";
 
@@ -324,6 +325,14 @@ export class ServersService implements OnApplicationBootstrap {
       data,
       include: { cluster: true },
     });
+    // Renamed a live server → rename its container too, so the Unraid dashboard
+    // and bridge RCON host stay in sync without a restart. Best-effort: containers
+    // are matched by the ark.serverId label, so a failure here is purely cosmetic.
+    if (dto.name !== undefined && dto.name !== existing.name && existing.containerId) {
+      await this.docker
+        .rename(existing.containerId, containerName(id, dto.name))
+        .catch((e) => this.logger.warn(`rename container for ${id} failed: ${(e as Error).message}`));
+    }
     await this.events.emit({
       type: EventType.ConfigChanged,
       message: `Updated server "${updated.name}"`,
