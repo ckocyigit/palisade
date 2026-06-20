@@ -8,7 +8,7 @@ import { Copy, Check, Terminal } from "lucide-react";
  * The IP is taken from the host the manager is served on
  * (window.location.hostname): the manager and the game containers run on the
  * same box, so that host is the server's local address. Pasting
- * `open <ip>:<gameport>` into the ARK console (Tab) connects straight across
+ * `open <ip>:<gameport>` into the ARK console (~ key) connects straight across
  * the LAN — bypassing EOS/the public IP, so there's no NAT-reflection
  * round-trip and the lowest possible latency for same-network play.
  */
@@ -62,7 +62,7 @@ export function ConnectCommand({
       <button
         type="button"
         onClick={copy}
-        title="Copy, then paste into the ARK console (Tab) and press Enter to connect directly over your local network"
+        title="Copy, then paste into the ARK console (~ key) and press Enter to connect directly over your local network"
         className="group flex w-full items-center gap-2 rounded-md border border-ark-border bg-ark-bg px-2.5 py-1.5 text-left transition-colors hover:border-slate-600"
       >
         <span className="flex-1 truncate font-mono text-sm text-slate-200">{cmd}</span>
@@ -77,7 +77,7 @@ export function ConnectCommand({
         )}
       </button>
       <p className="mt-1 text-[11px] leading-snug text-slate-500">
-        Open the ARK console (<kbd className="rounded bg-ark-panel px-1 font-mono">Tab</kbd>), paste, press
+        Open the ARK console (<kbd className="rounded bg-ark-panel px-1 font-mono">~</kbd>), paste, press
         Enter.
       </p>
     </div>
