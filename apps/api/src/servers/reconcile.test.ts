@@ -96,6 +96,23 @@ describe("reconcile()", () => {
     expect(attached).toContain("s1");
   });
 
+  it("resumes an interrupted stop (Stopping + still-running container), not adopt as Running", async () => {
+    const { svc, forced, attached } = makeService(
+      [{ id: "s1", name: "A", state: ServerState.Stopping, containerId: "c1" }],
+      [{ id: "c1", serverId: "s1", running: true, status: "Up 9m" }],
+    );
+    const teardown = vi
+      .spyOn(
+        svc as unknown as { tearDownStopped: (a: string, b: string) => Promise<void> },
+        "tearDownStopped",
+      )
+      .mockResolvedValue(undefined);
+    await svc.reconcile();
+    expect(teardown).toHaveBeenCalledWith("s1", "c1"); // finishes the stop
+    expect(forced).toHaveLength(0); // NOT flipped back to Running
+    expect(attached).toHaveLength(0); // NOT re-adopted
+  });
+
   it("marks a Running server Crashed when its container exited while we were down", async () => {
     const { svc, forced, removed } = makeService(
       [{ id: "s1", name: "A", state: ServerState.Running, containerId: "c1" }],

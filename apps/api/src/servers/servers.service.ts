@@ -63,6 +63,13 @@ export class ServersService implements OnApplicationBootstrap {
   private readonly crashTimes = new Map<string, number[]>();
   /** Serializes lifecycle ops per server (no double-start / start-while-update). */
   private readonly locks = new Map<string, Promise<unknown>>();
+  /**
+   * Servers being deliberately stopped. The crash watchdog checks this so a
+   * container exiting *because we asked it to* is never mistaken for a crash and
+   * auto-restarted (belt-and-suspenders over the Stopping-state guard, which can
+   * race the exit).
+   */
+  private readonly stopping = new Set<string>();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -104,10 +111,20 @@ export class ServersService implements OnApplicationBootstrap {
 
     let adopted = 0;
     let reset = 0;
+    let resumed = 0;
     for (const server of servers) {
       const c = byServer.get(server.id);
       const dbState = server.state as ServerState;
       if (c?.running) {
+        if (dbState === ServerState.Stopping) {
+          // We died mid-stop (typically a manager update). Finish the stop the
+          // user asked for, rather than re-adopting the container as Running and
+          // silently undoing it.
+          this.logger.log(`reconcile: resuming interrupted stop for ${server.id}`);
+          void this.tearDownStopped(server.id, c.id);
+          resumed++;
+          continue;
+        }
         await this.adoptRunning(server.id, c.id, dbState);
         adopted++;
       } else {
@@ -129,8 +146,10 @@ export class ServersService implements OnApplicationBootstrap {
         }
       }
     }
-    if (adopted || reset) {
-      this.logger.log(`Reconcile: adopted ${adopted} running, reset ${reset} stale`);
+    if (adopted || reset || resumed) {
+      this.logger.log(
+        `Reconcile: adopted ${adopted} running, reset ${reset} stale, resumed ${resumed} stop`,
+      );
     }
   }
 
@@ -479,23 +498,58 @@ export class ServersService implements OnApplicationBootstrap {
     }
   }
 
-  /** The actual shutdown, run detached from the HTTP request. */
+  /**
+   * The actual shutdown, run detached from the HTTP request.
+   *
+   * Order matters and every step is bounded so a stop can never hang for minutes:
+   *  1. Save the world and WAIT for ARK's "World Save Complete" (capped) so no
+   *     progress is lost — we do this OURSELVES rather than trusting POK's
+   *     SIGTERM handler, which doesn't reliably save.
+   *  2. SIGTERM with a SHORT grace, then force-remove. We don't give POK a long
+   *     graceful window: on SIGTERM it often relaunches ARK instead of exiting,
+   *     so a 180s grace just meant the container lingered for minutes. Since the
+   *     save is already on disk, a brief SIGTERM-then-SIGKILL is safe.
+   *  3. force-remove by label GUARANTEES the container is gone even if `stop`
+   *     misbehaved or the containerId was stale — so the server can never get
+   *     wedged in "Stopping" with a live container.
+   */
   private async tearDownStopped(id: string, containerId: string | null): Promise<void> {
-    // Save the world and WAIT for ARK's "World Save Complete" before shutting
-    // down, so no progress is lost. Then let docker stop do the rest: SIGTERM
-    // makes POK/hermsi shut the server down gracefully on their own. We do NOT
-    // send DoExit — that exits ARK out from under POK, which then tries to restart
-    // it and races the docker stop (the "saved again, then hung" you saw).
-    await this.saveAndWaitForSave(id, containerId);
-    await this.rcon.disconnect(id);
+    this.stopping.add(id); // suppress the crash watchdog for this deliberate exit
+    try {
+      await this.saveAndWaitForSave(id, containerId);
+      await this.rcon.disconnect(id).catch(() => undefined);
 
-    this.logStops.get(id)?.();
-    this.logStops.delete(id);
-    // Generous grace so the graceful shutdown isn't force-killed early.
-    if (containerId) await this.docker.stop(containerId, 180).catch(() => undefined);
-    await this.docker.removeByServerId(id).catch(() => undefined);
-    await this.prisma.server.update({ where: { id }, data: { containerId: null } }).catch(() => undefined);
-    await this.sm.transition(id, ServerState.Stopped).catch(() => undefined);
+      this.logStops.get(id)?.();
+      this.logStops.delete(id);
+
+      if (containerId) {
+        // 20s SIGTERM courtesy, then the daemon SIGKILLs — bounded at ~20s.
+        // Wrapped so even a hung docker API call can't block the force-remove.
+        await this.withTimeout(this.docker.stop(containerId, 20), 30_000).catch((e) =>
+          this.logger.warn(`stop(${id}): docker stop failed/slow: ${(e as Error).message}`),
+        );
+      }
+      // The guarantee: kill + remove anything still labelled for this server.
+      await this.docker.removeByServerId(id).catch((e) =>
+        this.logger.warn(`stop(${id}): force-remove failed: ${(e as Error).message}`),
+      );
+      await this.prisma.server
+        .update({ where: { id }, data: { containerId: null } })
+        .catch(() => undefined);
+      await this.sm.transition(id, ServerState.Stopped).catch(() => undefined);
+      this.logger.log(`stop(${id}): teardown complete → Stopped`);
+    } finally {
+      this.stopping.delete(id);
+    }
+  }
+
+  /** Resolve `p`, or resolve to undefined after `ms` — so a slow/hung step can't
+   *  block the rest of a teardown. */
+  private withTimeout<T>(p: Promise<T>, ms: number): Promise<T | undefined> {
+    return Promise.race([
+      p,
+      new Promise<undefined>((resolve) => setTimeout(() => resolve(undefined), ms)),
+    ]);
   }
 
   /**
@@ -507,7 +561,7 @@ export class ServersService implements OnApplicationBootstrap {
   private async saveAndWaitForSave(
     id: string,
     containerId: string | null,
-    timeoutMs = 60_000,
+    timeoutMs = 30_000,
   ): Promise<void> {
     if (!containerId) {
       await this.rcon.saveWorld(id).catch(() => undefined);
@@ -521,7 +575,9 @@ export class ServersService implements OnApplicationBootstrap {
         settled = true;
         clearTimeout(timer);
         stop();
-        if (!saved) {
+        if (saved) {
+          this.logger.log(`stop(${id}): world saved`);
+        } else {
           this.logger.warn(`No "World Save Complete" for ${id} within ${timeoutMs}ms — stopping anyway`);
         }
         resolve();
@@ -585,6 +641,8 @@ export class ServersService implements OnApplicationBootstrap {
   }
 
   private async onContainerExit(id: string): Promise<void> {
+    // Deliberate stop in progress → the teardown owns this exit, never a crash.
+    if (this.stopping.has(id)) return;
     const state = await this.sm.current(id).catch(() => null);
     // Expected stop → ignore; we already drive Stopping/Stopped explicitly.
     if (!state || ![ServerState.Running, ServerState.Starting].includes(state)) return;
