@@ -473,20 +473,66 @@ export class ServersService implements OnApplicationBootstrap {
 
   /** The actual shutdown, run detached from the HTTP request. */
   private async tearDownStopped(id: string, containerId: string | null): Promise<void> {
-    // Best-effort explicit save (shows in the log). The authoritative save is the
-    // graceful shutdown below: SIGTERM makes POK/hermsi save the world before the
-    // server process exits, and docker.stop waits for that to finish.
-    await this.rcon.saveWorld(id).catch(() => undefined);
+    // Save the world and WAIT for ARK's "World Save Complete" before shutting
+    // down, so no progress is lost on stop. THEN exit + SIGTERM.
+    await this.saveAndWaitForSave(id, containerId);
     await this.rcon.doExit(id).catch(() => undefined);
     await this.rcon.disconnect(id);
 
     this.logStops.get(id)?.();
     this.logStops.delete(id);
-    // Generous grace so a large world's save-on-exit isn't force-killed.
+    // Generous grace so the shutdown isn't force-killed early.
     if (containerId) await this.docker.stop(containerId, 180).catch(() => undefined);
     await this.docker.removeByServerId(id).catch(() => undefined);
     await this.prisma.server.update({ where: { id }, data: { containerId: null } }).catch(() => undefined);
     await this.sm.transition(id, ServerState.Stopped).catch(() => undefined);
+  }
+
+  /**
+   * Issue SaveWorld and resolve only once ARK logs "World Save Complete" — the
+   * definitive signal that the save is on disk. (The SaveWorld RCON reply is
+   * unreliable, which is why we watch the log instead.) Falls back after a
+   * timeout so a missing line can't hang the shutdown forever.
+   */
+  private async saveAndWaitForSave(
+    id: string,
+    containerId: string | null,
+    timeoutMs = 60_000,
+  ): Promise<void> {
+    if (!containerId) {
+      await this.rcon.saveWorld(id).catch(() => undefined);
+      return;
+    }
+    await new Promise<void>((resolve) => {
+      let settled = false;
+      let stop = () => {};
+      const finish = (saved: boolean) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        stop();
+        if (!saved) {
+          this.logger.warn(`No "World Save Complete" for ${id} within ${timeoutMs}ms — stopping anyway`);
+        }
+        resolve();
+      };
+      const timer = setTimeout(() => finish(false), timeoutMs);
+      // tail:0 → only lines from now on, so we catch THIS save's completion, not an
+      // old autosave already in the history.
+      void this.docker
+        .followLogs(
+          containerId,
+          (line) => {
+            if (/World Save Complete/i.test(line)) finish(true);
+          },
+          0,
+        )
+        .then((s) => {
+          stop = s;
+          void this.rcon.saveWorld(id).catch(() => undefined); // trigger the save now we're listening
+        })
+        .catch(() => finish(false)); // can't follow logs → don't block the stop
+    });
   }
 
   async restart(id: string): Promise<void> {

@@ -136,13 +136,17 @@ export class DockerService {
   }
 
   /** Tail logs; calls onLine for each line. Returns a stop() function. */
-  async followLogs(id: string, onLine: (line: string) => void): Promise<() => void> {
+  async followLogs(
+    id: string,
+    onLine: (line: string) => void,
+    tail: number = 200,
+  ): Promise<() => void> {
     const container = this.docker.getContainer(id);
     const stream = (await container.logs({
       follow: true,
       stdout: true,
       stderr: true,
-      tail: 200,
+      tail, // 0 = only new lines (used to watch for a fresh "World Save Complete")
     })) as unknown as NodeJS.ReadableStream;
 
     const out = new PassThrough();
