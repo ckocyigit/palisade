@@ -482,14 +482,16 @@ export class ServersService implements OnApplicationBootstrap {
   /** The actual shutdown, run detached from the HTTP request. */
   private async tearDownStopped(id: string, containerId: string | null): Promise<void> {
     // Save the world and WAIT for ARK's "World Save Complete" before shutting
-    // down, so no progress is lost on stop. THEN exit + SIGTERM.
+    // down, so no progress is lost. Then let docker stop do the rest: SIGTERM
+    // makes POK/hermsi shut the server down gracefully on their own. We do NOT
+    // send DoExit — that exits ARK out from under POK, which then tries to restart
+    // it and races the docker stop (the "saved again, then hung" you saw).
     await this.saveAndWaitForSave(id, containerId);
-    await this.rcon.doExit(id).catch(() => undefined);
     await this.rcon.disconnect(id);
 
     this.logStops.get(id)?.();
     this.logStops.delete(id);
-    // Generous grace so the shutdown isn't force-killed early.
+    // Generous grace so the graceful shutdown isn't force-killed early.
     if (containerId) await this.docker.stop(containerId, 180).catch(() => undefined);
     await this.docker.removeByServerId(id).catch(() => undefined);
     await this.prisma.server.update({ where: { id }, data: { containerId: null } }).catch(() => undefined);
