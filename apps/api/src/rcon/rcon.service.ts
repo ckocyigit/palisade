@@ -44,9 +44,18 @@ export class RconService {
     // interactive commands snappy without spurious timeouts. (The world save on
     // stop is handled by the container's graceful SIGTERM shutdown, not by waiting
     // on the SaveWorld RCON reply — ARK doesn't reliably reply when it's done.)
-    const rcon = await Rcon.connect({ host, port: server.rconPort, password, timeout: 10_000 });
+    // Construct + attach the 'error' listener BEFORE connecting, not after. The
+    // static Rcon.connect() wires up `socket.on("error", e => emitter.emit("error"))`
+    // internally and only resolves after auth — so attaching our listener after it
+    // returns leaves a window (the connect/auth phase, and any reconnect that races
+    // the container being killed during a stop) where a socket ECONNRESET re-emits
+    // on an emitter with NO 'error' listener. Node then throws an unhandled 'error'
+    // event and the ENTIRE manager process crashes. Attaching first closes that
+    // window for the connection's whole lifetime.
+    const rcon = new Rcon({ host, port: server.rconPort, password, timeout: 10_000 });
     rcon.on("error", () => this.pool.delete(serverId));
     rcon.on("end", () => this.pool.delete(serverId));
+    await rcon.connect();
     this.pool.set(serverId, rcon);
     return rcon;
   }
@@ -109,6 +118,13 @@ export class RconService {
   async disconnect(serverId: string): Promise<void> {
     const rcon = this.pool.get(serverId);
     this.pool.delete(serverId);
-    await rcon?.end().catch(() => undefined);
+    if (!rcon) return;
+    // end() awaits the socket's "end" event, which may never arrive if the peer
+    // was just killed — bound it so it can't stall a shutdown. The error/end
+    // listeners stay attached, so any late ECONNRESET is still swallowed.
+    await Promise.race([
+      rcon.end().catch(() => undefined),
+      new Promise<void>((resolve) => setTimeout(resolve, 3000)),
+    ]);
   }
 }
