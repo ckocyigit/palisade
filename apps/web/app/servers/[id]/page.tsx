@@ -11,11 +11,12 @@ import { UnofficialListHelp } from "@/components/unofficial-list-help";
 import { SettingsForm } from "@/components/settings-form";
 import { CopyMenu } from "@/components/copy-menu";
 import { RconConsole } from "@/components/rcon-console";
+import { LogsTab } from "@/components/logs-tab";
 import { ScheduleList } from "@/components/schedule-list";
 import { ModsTab } from "@/components/mods-tab";
 import { BackupsTab } from "@/components/backups-tab";
 
-const TABS = ["Overview", "Settings", "Mods", "Console", "Schedules", "Backups"] as const;
+const TABS = ["Overview", "Settings", "Mods", "Console", "Logs", "Schedules", "Backups"] as const;
 type Tab = (typeof TABS)[number];
 
 export default function ServerDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -146,6 +147,7 @@ export default function ServerDetailPage({ params }: { params: Promise<{ id: str
         ))}
       {tab === "Mods" && <ModsTab serverId={id} game={server.game} />}
       {tab === "Console" && <RconConsole serverId={id} />}
+      {tab === "Logs" && <LogsTab serverId={id} />}
       {tab === "Schedules" && <ScheduleList serverId={id} />}
       {tab === "Backups" && <BackupsTab serverId={id} />}
     </div>

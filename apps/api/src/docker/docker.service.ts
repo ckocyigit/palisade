@@ -8,6 +8,23 @@ export interface RunResult {
   log: string;
 }
 
+/** Strip ANSI colour/escape sequences so log lines render cleanly in the UI. */
+const stripAnsi = (s: string): string => s.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "");
+
+/** Demultiplex Docker's non-TTY log buffer (8-byte frame header per chunk). */
+function demuxLog(buf: Buffer): string {
+  let out = "";
+  let i = 0;
+  while (i + 8 <= buf.length) {
+    const len = buf.readUInt32BE(i + 4);
+    const start = i + 8;
+    const end = Math.min(start + len, buf.length);
+    out += buf.toString("utf8", start, end);
+    i = end;
+  }
+  return out || buf.toString("utf8"); // fall back if it wasn't framed
+}
+
 /**
  * Thin wrapper over dockerode. Connects to Docker via DOCKER_HOST: the host's
  * unix socket by default (unix:///var/run/docker.sock, mounted into the
@@ -91,7 +108,7 @@ export class DockerService {
       stderr: true,
       tail,
     })) as unknown as Buffer;
-    return buf.toString("utf8");
+    return stripAnsi(demuxLog(buf));
   }
 
   async createContainer(opts: Docker.ContainerCreateOptions): Promise<string> {
@@ -158,7 +175,7 @@ export class DockerService {
       while ((idx = buffer.indexOf("\n")) >= 0) {
         const line = buffer.slice(0, idx);
         buffer = buffer.slice(idx + 1);
-        onLine(line);
+        onLine(stripAnsi(line));
       }
     });
     return () => {

@@ -180,6 +180,14 @@ export class ServersService implements OnApplicationBootstrap {
     return this.toSummary(row, imageReady);
   }
 
+  /** The last N lines of the server's container log (empty when not running). */
+  async tailLog(id: string, tail = 200): Promise<string> {
+    const server = await this.prisma.server.findUnique({ where: { id } });
+    if (!server) throw new NotFoundException("Server not found");
+    if (!server.containerId) return "";
+    return this.docker.tailLogs(server.containerId, tail).catch(() => "");
+  }
+
   async getConfig(id: string): Promise<ServerConfigValues> {
     const row = await this.prisma.server.findUnique({ where: { id } });
     if (!row) throw new NotFoundException("Server not found");

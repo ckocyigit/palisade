@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from "@nestjs/common";
 import { IsArray, IsBoolean, IsString } from "class-validator";
 import type { CreateServerDto, UpdateServerDto } from "@ark/shared";
 import { ServersService } from "./servers.service";
@@ -31,6 +31,12 @@ export class ServersController {
   @Get(":id/config")
   getConfig(@Param("id") id: string) {
     return this.servers.getConfig(id);
+  }
+
+  @Get(":id/logs")
+  async logs(@Param("id") id: string, @Query("tail") tail?: string) {
+    const n = Math.min(2000, Math.max(1, Number(tail) || 200));
+    return { log: await this.servers.tailLog(id, n) };
   }
 
   @Get(":id/events")
