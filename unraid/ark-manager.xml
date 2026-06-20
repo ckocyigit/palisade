@@ -9,8 +9,8 @@
      between servers, which only works on a single real filesystem (btrfs/XFS). -->
 <Container version="2">
   <Name>ARK-Server-Manager</Name>
-  <Repository>ark-manager:local</Repository>
-  <Registry/>
+  <Repository>ghcr.io/shakes63/ark-server-manager:latest</Repository>
+  <Registry>https://github.com/Shakes63/ark-server-manager/pkgs/container/ark-server-manager</Registry>
   <Network>ark-net</Network>
   <Privileged>false</Privileged>
   <Support/>
