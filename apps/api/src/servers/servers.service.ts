@@ -40,20 +40,23 @@ type ServerRow = Awaited<ReturnType<PrismaService["server"]["findUnique"]>> & {
   cluster?: { clusterId: string } | null;
 };
 
-// Readiness markers across both runtimes. POK/ASA pipes ARK's own log to stdout
-// (`... has successfully started!` / `Full Startup:` / `advertising for join`);
-// the hermsi/ASE image instead prints arkmanager's `server is up` on stdout (the
-// game's advertising line goes to a file inside the container, not docker logs).
+// Readiness marker: when is the server actually joinable? POK/ASA pipes ARK's own
+// log to stdout, which escalates through THREE markers as it finishes booting —
+// `has successfully started!`, then `Full Startup: N seconds`, then finally
+// `Server has completed startup and is now advertising for join`. Only the LAST
+// means players can connect; the first two fire ~30s earlier (still finalizing
+// world save / GC), so flipping on them shows "Running" before the server takes
+// joins. We wait for `advertising for join`. The hermsi/ASE image instead prints
+// arkmanager's `server is up` on stdout (ASE's own advertising line goes to a
+// file inside the container, not docker logs), so keep that for ASE.
 //
-// The `(?!')` guards are essential: POK logs a line that QUOTES the markers —
+// The `(?!')` guard is essential: POK logs a line that QUOTES the marker —
 //   Waiting for startup completion markers: 'Full Startup:' or 'Server has
 //   completed startup and is now advertising for join'
-// Without the lookaheads, that quoted mention matches and flips the server to
-// Running the instant it starts booting. The real completion line isn't quoted
-// (it ends with `. (NN.NGB Mem)`), so rejecting a trailing single-quote tells
-// the two apart — and works whether we test one line or a multi-line blob.
-export const READY_RE =
-  /(has successfully started|Full Startup:(?!')|advertising for join(?!')|server is up)/i;
+// — while still booting. The real completion line isn't quoted (it ends with
+// `. (NN.NGB Mem)`), so rejecting a trailing single-quote after "join" tells the
+// two apart, whether we test one line or a multi-line blob.
+export const READY_RE = /(advertising for join(?!')|server is up)/i;
 const CRASH_WINDOW_MS = 5 * 60_000;
 const CRASH_LIMIT = 3;
 

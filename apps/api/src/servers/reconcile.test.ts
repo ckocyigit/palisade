@@ -68,7 +68,7 @@ describe("reconcile()", () => {
     const { svc, forced, attached } = makeService(
       [{ id: "s1", name: "A", state: ServerState.Starting, containerId: "old" }],
       [{ id: "c1", serverId: "s1", running: true, status: "Up 2h" }],
-      { c1: "ARK Server ... has successfully started!" },
+      { c1: "Server has completed startup and is now advertising for join. (10.2GB Mem)" },
     );
     await svc.reconcile();
     expect(forced).toEqual([{ id: "s1", to: ServerState.Running, reason: expect.any(String) }]);
