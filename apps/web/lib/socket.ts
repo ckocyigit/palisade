@@ -18,7 +18,10 @@ export function useRealtime(
     const socket: Socket = io({
       path: "/socket.io",
       query: serverId ? { serverId } : undefined,
-      transports: ["websocket"],
+      // HTTP long-polling proxies cleanly through the Next.js rewrite; a raw
+      // WebSocket upgrade does not (Next rewrites don't proxy WS), so polling is
+      // the reliable baseline for the single-container deploy.
+      transports: ["polling"],
     });
     socket.on("message", (msg: RealtimeMessage) => handler.current(msg));
     return () => {

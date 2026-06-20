@@ -12,7 +12,10 @@ import type { RealtimeMessage } from "@ark/shared";
  * Socket.IO gateway for live status, log tails, install progress, RCON output,
  * and events. Clients subscribe to a server room to scope traffic.
  */
-@WebSocketGateway({ cors: { origin: true, credentials: true } })
+// addTrailingSlash:false lets engine.io accept the path after Next's rewrite
+// strips the trailing slash from `/socket.io/`; without it the polling
+// handshake 404s behind the single-origin proxy.
+@WebSocketGateway({ cors: { origin: true, credentials: true }, addTrailingSlash: false })
 export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect {
   private readonly logger = new Logger(RealtimeGateway.name);
 
