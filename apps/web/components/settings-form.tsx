@@ -150,23 +150,9 @@ export function SettingsForm({
     game: initial.rawGameIni ?? "",
     args: initial.rawCommandLineArgs ?? "",
   });
-  const [showAdvanced, setShowAdvanced] = useState(false);
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
-  // Remember the advanced toggle across visits (read post-mount to avoid an SSR
-  // hydration mismatch; persist on every change).
-  useEffect(() => {
-    setShowAdvanced(localStorage.getItem("ark.showAdvanced") === "1");
-  }, []);
-  const toggleAdvanced = (on: boolean) => {
-    setShowAdvanced(on);
-    try {
-      localStorage.setItem("ark.showAdvanced", on ? "1" : "0");
-    } catch {
-      /* ignore storage failures */
-    }
-  };
   const [activeGroup, setActiveGroup] = useState("general");
   const [query, setQuery] = useState("");
   // Provenance: which preset last set each key (+ the value it set). Declared up
@@ -225,21 +211,6 @@ export function SettingsForm({
   useEffect(() => {
     apiGet<SettingsCatalog>(`/catalog/${game}`).then(setCatalog).catch(() => undefined);
   }, [game]);
-
-  // Categories whose settings are ALL advanced (shown only when advanced is on).
-  const advancedCats = useMemo(() => {
-    const counts = new Map<string, { total: number; advanced: number }>();
-    for (const d of catalog?.settings ?? []) {
-      const c = counts.get(d.category) ?? { total: 0, advanced: 0 };
-      c.total++;
-      if (d.advanced) c.advanced++;
-      counts.set(d.category, c);
-    }
-    const adv = new Set<string>();
-    for (const [cat, c] of counts) if (c.total > 0 && c.advanced === c.total) adv.add(cat);
-    return adv;
-  }, [catalog]);
-
 
   // All categories with their defs, in catalog order.
   const allByCat = useMemo(() => {
@@ -303,12 +274,11 @@ export function SettingsForm({
     if (grp.id === "advanced") {
       cats = [...cats, ...[...allByCat.keys()].filter((c) => !MAPPED_CATS.has(c))];
     }
-    // Everyday sections first, advanced-only last; drop empties (advanced hidden).
-    return [...cats.filter((c) => !advancedCats.has(c)), ...cats.filter((c) => advancedCats.has(c))]
-      .map((c) => [c, (allByCat.get(c) ?? []).filter((d) => (d.advanced ? showAdvanced : true))] as [string, SettingDef[]])
+    return cats
+      .map((c) => [c, allByCat.get(c) ?? []] as [string, SettingDef[]])
       .filter(([, defs]) => defs.length > 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [catalog, query, activeGroup, showAdvanced, advancedCats, allByCat, map, presetFilter, presetMarks]);
+  }, [catalog, query, activeGroup, allByCat, map, presetFilter, presetMarks]);
 
   const searching = query.trim().length > 0;
   // Count of currently-visible (catalog + map-relevant) preset-set settings.
@@ -416,14 +386,6 @@ export function SettingsForm({
           />
         </div>
         <div className="flex items-center gap-2">
-          <label className="flex items-center gap-2 text-sm text-slate-400">
-            <input
-              type="checkbox"
-              checked={showAdvanced}
-              onChange={(e) => toggleAdvanced(e.target.checked)}
-            />
-            Advanced
-          </label>
           {totalChanged > 0 && <span className="text-xs text-slate-400">{totalChanged} changed</span>}
           {presetCount > 0 && (
             <button
@@ -526,12 +488,8 @@ export function SettingsForm({
       {sections.map(([category, defs]) => {
         const changed = defs.filter(isOverridden).length;
         const isCollapsed = !searching && collapsed.has(category);
-        const isAdv = advancedCats.has(category);
         return (
-          <div
-            key={category}
-            className={`card ${isAdv ? "border-l-4 border-amber-500/30 border-l-amber-500/60 bg-amber-500/[0.04]" : ""}`}
-          >
+          <div key={category} className="card">
             <div className="flex w-full items-center justify-between gap-2">
               <button
                 type="button"
@@ -543,17 +501,8 @@ export function SettingsForm({
                 ) : (
                   <ChevronDown className="h-4 w-4 shrink-0" />
                 )}
-                <h3
-                  className={`flex items-center gap-2 text-sm font-semibold uppercase tracking-wide ${
-                    isAdv ? "text-amber-400/90" : "text-ark-accent2"
-                  }`}
-                >
+                <h3 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-ark-accent2">
                   {category}
-                  {isAdv && (
-                    <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-normal normal-case tracking-normal text-amber-400/80">
-                      advanced
-                    </span>
-                  )}
                 </h3>
               </button>
               <div className="flex items-center gap-2">
@@ -609,16 +558,14 @@ export function SettingsForm({
               ? "No preset-set settings to review — apply a preset, or clear this filter."
             : activeGroup === "maps"
               ? `No map-specific settings for ${mapLabel(map)}. This tab only shows options for maps like Ragnarok, Genesis, Lost Colony, Fjordur or Astraeos.`
-              : !showAdvanced
-                ? "This tab only has advanced settings — turn on Advanced (top right) to see them."
-                : "Nothing here."}
+              : "Nothing here."}
         </div>
       )}
 
       {/* Raw passthrough lives under the Advanced tab. */}
       {activeGroup === "advanced" && !searching && (
         <div className="card space-y-4">
-          <h3 className="text-sm font-semibold uppercase tracking-wide text-amber-400">
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-ark-accent2">
             Raw passthrough (anything not above)
           </h3>
           <RawArea label="GameUserSettings.ini" value={raw.gus} onChange={(v) => setRaw((r) => ({ ...r, gus: v }))} />
@@ -797,6 +744,16 @@ function Field({
   // A setting may be inactive because another one disables it (e.g. PvE mode
   // greys out PvP-only options, a master toggle being off greys its sub-options).
   const dep = get ? settingActive(def.key, get) : { active: true as const, reason: undefined };
+  // displayScale lets a numeric field show a derived figure (e.g. difficulty ×30
+  // = max wild creature level) while still storing the raw value.
+  const scale = def.displayScale ?? 1;
+  const stepRaw = def.step ?? (def.type === "float" ? 0.1 : 1);
+  const round = (x: number, p: number) => Math.round(x * 10 ** p) / 10 ** p;
+  const toShown = (v: unknown) => round(Number(v) * scale, 2);
+  const toStored = (shown: number) => round(shown / scale, 3);
+  const shownMin = def.min != null ? round(def.min * scale, 2) : undefined;
+  const shownMax = def.max != null ? round(def.max * scale, 2) : undefined;
+  const shownStep = round(stepRaw * scale, 3);
   return (
     <div className={STRUCTURED.has(def.type) ? "md:col-span-2" : undefined}>
       <FieldLabel label={def.label} help={def.help} overridden={overridden} />
@@ -869,30 +826,35 @@ function Field({
             <input
               type="range"
               className="h-2 w-full cursor-pointer accent-ark-accent"
-              min={def.min ?? 0}
-              max={def.max ?? 100}
-              step={def.step ?? (def.type === "float" ? 0.1 : 1)}
-              value={Number(value)}
-              onChange={(e) => onChange(def.key, Number(e.target.value))}
+              min={shownMin ?? 0}
+              max={shownMax ?? 100}
+              step={shownStep}
+              value={toShown(value)}
+              onChange={(e) => onChange(def.key, toStored(Number(e.target.value)))}
             />
           </div>
-          <input
-            type="number"
-            className={`w-20 shrink-0 rounded-lg border bg-ark-bg px-2 py-1.5 text-right text-sm outline-none focus:border-ark-accent2 ${
-              overridden ? "border-ark-accent/70 text-ark-accent" : "border-ark-border"
-            }`}
-            min={def.min}
-            max={def.max}
-            step={def.step ?? (def.type === "float" ? 0.1 : 1)}
-            value={Number(value)}
-            onChange={(e) => onChange(def.key, Number(e.target.value))}
-          />
+          <div className="flex shrink-0 items-center gap-1.5">
+            <input
+              type="number"
+              className={`w-20 rounded-lg border bg-ark-bg px-2 py-1.5 text-right text-sm outline-none focus:border-ark-accent2 ${
+                overridden ? "border-ark-accent/70 text-ark-accent" : "border-ark-border"
+              }`}
+              min={shownMin}
+              max={shownMax}
+              step={shownStep}
+              value={toShown(value)}
+              onChange={(e) => onChange(def.key, toStored(Number(e.target.value)))}
+            />
+            {def.unit && <span className="text-xs text-slate-500">{def.unit}</span>}
+          </div>
         </div>
       )}
       {(def.type === "int" || def.type === "float") && (
         <p className="mt-1 text-xs text-slate-500">
-          Range {def.min ?? 0} – {def.max ?? "∞"}
-          {def.step ? ` · step ${def.step}` : ""}
+          Range {shownMin ?? 0} – {shownMax ?? "∞"}
+          {def.unit ? ` ${def.unit}` : ""}
+          {stepRaw ? ` · step ${shownStep}` : ""}
+          {scale !== 1 ? ` · difficulty ${round(Number(value), 2)}` : ""}
         </p>
       )}
       </fieldset>
