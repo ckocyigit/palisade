@@ -299,17 +299,63 @@ export class ServersService implements OnApplicationBootstrap {
     if (!existing) throw new NotFoundException("Server not found");
 
     const data: Record<string, unknown> = {};
-    if (dto.name !== undefined) data.name = dto.name;
-    if (dto.map !== undefined) data.map = dto.map;
-    if (dto.maxPlayers !== undefined) data.maxPlayers = dto.maxPlayers;
-    if (dto.clusterId !== undefined) data.clusterId = dto.clusterId;
-    if (dto.modIds !== undefined) data.modIds = JSON.stringify(dto.modIds);
-    if (dto.ramLimitMb !== undefined) data.ramLimitMb = dto.ramLimitMb;
-    if (dto.cpuLimit !== undefined) data.cpuLimit = dto.cpuLimit;
-    if (dto.adminPassword) data.adminPasswordEnc = this.crypto.encrypt(dto.adminPassword);
-    if (dto.serverPassword) data.serverPasswordEnc = this.crypto.encrypt(dto.serverPassword);
-    if (dto.spectatorPassword)
-      data.spectatorPasswordEnc = this.crypto.encrypt(dto.spectatorPassword);
+    // Almost everything here is baked into the launch command / generated INI when
+    // the container is created (SessionName from name, ServerPassword, max players,
+    // -mods, settings, resource limits...). A running server therefore needs a
+    // RESTART to pick the change up. Track that so we can flag configDirty and the
+    // UI shows the Restart button — the same affordance settings/mod edits already
+    // get. Diff against the current value so re-saving an unchanged field (e.g. the
+    // settings form re-sending the name) doesn't spuriously prompt a restart.
+    let launchChanged = false;
+    if (dto.name !== undefined && dto.name !== existing.name) {
+      data.name = dto.name;
+      launchChanged = true;
+    }
+    if (dto.map !== undefined && dto.map !== existing.map) {
+      data.map = dto.map;
+      launchChanged = true;
+    }
+    if (dto.maxPlayers !== undefined && dto.maxPlayers !== existing.maxPlayers) {
+      data.maxPlayers = dto.maxPlayers;
+      launchChanged = true;
+    }
+    if (dto.clusterId !== undefined && dto.clusterId !== existing.clusterId) {
+      data.clusterId = dto.clusterId;
+      launchChanged = true;
+    }
+    if (dto.modIds !== undefined) {
+      const next = JSON.stringify(dto.modIds);
+      if (next !== existing.modIds) {
+        data.modIds = next;
+        launchChanged = true;
+      }
+    }
+    if (dto.ramLimitMb !== undefined && dto.ramLimitMb !== existing.ramLimitMb) {
+      data.ramLimitMb = dto.ramLimitMb;
+      launchChanged = true;
+    }
+    if (dto.cpuLimit !== undefined && dto.cpuLimit !== existing.cpuLimit) {
+      data.cpuLimit = dto.cpuLimit;
+      launchChanged = true;
+    }
+    // Passwords: diff against the DECRYPTED current value — re-encrypting always
+    // produces different ciphertext, so the stored blob can't be compared directly.
+    const applyPassword = (enc: string | null, next: string | undefined, field: string) => {
+      if (next === undefined || next === "") return; // blank/absent = leave as-is
+      let current: string;
+      try {
+        current = enc ? this.crypto.decrypt(enc) : "";
+      } catch {
+        current = " "; // undecryptable → treat as a change
+      }
+      if (next !== current) {
+        data[field] = this.crypto.encrypt(next);
+        launchChanged = true;
+      }
+    };
+    applyPassword(existing.adminPasswordEnc, dto.adminPassword, "adminPasswordEnc");
+    applyPassword(existing.serverPasswordEnc, dto.serverPassword, "serverPasswordEnc");
+    applyPassword(existing.spectatorPasswordEnc, dto.spectatorPassword, "spectatorPasswordEnc");
     if (dto.config) {
       const merged: ServerConfigValues = {
         ...JSON.parse(existing.configJson),
@@ -320,8 +366,9 @@ export class ServersService implements OnApplicationBootstrap {
         },
       };
       data.configJson = JSON.stringify(merged);
-      data.configDirty = true; // settings changed — flag a restart if it's running
+      launchChanged = true; // settings feed the generated INI / command line
     }
+    if (launchChanged) data.configDirty = true; // → UI shows the Restart button
 
     const updated = await this.prisma.server.update({
       where: { id },
