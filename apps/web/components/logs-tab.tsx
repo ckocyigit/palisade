@@ -4,11 +4,12 @@ import { RefreshCw, ScrollText } from "lucide-react";
 import { apiGet } from "@/lib/api";
 import { useRealtime } from "@/lib/socket";
 
-/** Live tail of the server's container log: the last N lines, plus new lines as
- *  they arrive over realtime while the server is running. */
+const MAX_LINES = 6000;
+
+/** Full log of the current run, captured server-side — complete whether or not
+ *  this tab was open, kept across refreshes/tab switches, wiped on the next Start. */
 export function LogsTab({ serverId }: { serverId: string }) {
   const [lines, setLines] = useState<string[]>([]);
-  const [tail, setTail] = useState(50);
   const [loading, setLoading] = useState(false);
   const boxRef = useRef<HTMLDivElement>(null);
   const atBottom = useRef(true);
@@ -18,23 +19,22 @@ export function LogsTab({ serverId }: { serverId: string }) {
       if (boxRef.current) boxRef.current.scrollTop = boxRef.current.scrollHeight;
     });
 
-  const load = (n: number) => {
+  const load = () => {
     setLoading(true);
-    apiGet<{ log: string }>(`/servers/${serverId}/logs?tail=${n}`)
+    apiGet<{ log: string }>(`/servers/${serverId}/logs`)
       .then(({ log }) => {
-        setLines(log.split("\n").filter((l) => l.length > 0));
+        setLines(log ? log.split("\n") : []);
         scrollToBottom();
       })
       .catch(() => undefined)
       .finally(() => setLoading(false));
   };
+  useEffect(load, [serverId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => load(tail), [serverId, tail]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Append new lines live; only auto-scroll when the user is already at the bottom.
+  // Append live lines; only auto-scroll when already at the bottom.
   useRealtime((msg) => {
     if (msg.serverId === serverId && msg.topic === "server.log") {
-      setLines((prev) => [...prev.slice(-2000), (msg.payload as { line: string }).line]);
+      setLines((prev) => [...prev.slice(-(MAX_LINES - 1)), (msg.payload as { line: string }).line]);
       if (atBottom.current) scrollToBottom();
     }
   }, serverId);
@@ -42,18 +42,11 @@ export function LogsTab({ serverId }: { serverId: string }) {
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
-        <button className="btn-secondary" onClick={() => load(tail)} disabled={loading}>
+        <button className="btn-secondary" onClick={load} disabled={loading}>
           <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Refresh
         </button>
-        <select className="input w-auto" value={tail} onChange={(e) => setTail(Number(e.target.value))}>
-          {[20, 50, 100, 200, 500].map((n) => (
-            <option key={n} value={n}>
-              Last {n} lines
-            </option>
-          ))}
-        </select>
         <span className="flex items-center gap-1 text-xs text-slate-500">
-          <ScrollText className="h-3.5 w-3.5" /> Live while the server is running.
+          <ScrollText className="h-3.5 w-3.5" /> Full log of the current run — kept until the next Start.
         </span>
       </div>
       <div
@@ -62,14 +55,12 @@ export function LogsTab({ serverId }: { serverId: string }) {
           const el = e.currentTarget;
           atBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
         }}
-        className="h-[28rem] overflow-y-auto whitespace-pre-wrap rounded-lg border border-ark-border bg-black/40 p-3 font-mono text-xs leading-relaxed"
+        className="h-[32rem] overflow-y-auto whitespace-pre-wrap break-words rounded-lg border border-ark-border bg-black/40 p-3 font-mono text-xs leading-relaxed"
       >
         {lines.length === 0 ? (
-          <span className="text-slate-500">
-            No log output yet — the server may be stopped, or nothing has been logged.
-          </span>
+          <span className="text-slate-500">No log captured yet — start the server to capture this run.</span>
         ) : (
-          lines.map((l, i) => <div key={i}>{l}</div>)
+          lines.join("\n")
         )}
       </div>
     </div>

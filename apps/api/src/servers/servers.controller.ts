@@ -39,10 +39,16 @@ export class ServersController {
     return this.servers.getConfig(id);
   }
 
+  // Captured log/console for the current run (survives refresh + tab switches;
+  // wiped on Start). Complete whether or not a tab was open during boot.
   @Get(":id/logs")
-  async logs(@Param("id") id: string, @Query("tail") tail?: string) {
-    const n = Math.min(2000, Math.max(1, Number(tail) || 200));
-    return { log: await this.servers.tailLog(id, n) };
+  logs(@Param("id") id: string) {
+    return { log: this.servers.runLog(id) };
+  }
+
+  @Get(":id/console")
+  console(@Param("id") id: string) {
+    return { log: this.servers.runConsole(id) };
   }
 
   @Get(":id/stats")

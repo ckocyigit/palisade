@@ -6,6 +6,7 @@ import { apiGet, apiPost } from "@/lib/api";
 import { useRealtime } from "@/lib/socket";
 
 const PLAYER_POLL_MS = 20_000;
+const MAX_LINES = 6000;
 
 export function RconConsole({ serverId, state }: { serverId: string; state: ServerState }) {
   const [lines, setLines] = useState<string[]>([]);
@@ -14,9 +15,17 @@ export function RconConsole({ serverId, state }: { serverId: string; state: Serv
   const boxRef = useRef<HTMLDivElement>(null);
 
   const append = (line: string) => {
-    setLines((prev) => [...prev.slice(-400), line]);
+    setLines((prev) => [...prev.slice(-(MAX_LINES - 1)), line]);
     requestAnimationFrame(() => boxRef.current?.scrollTo(0, boxRef.current.scrollHeight));
   };
+
+  // Load the captured console (log + RCON I/O of the current run) on mount — kept
+  // across refreshes/tab switches, wiped on the next Start.
+  useEffect(() => {
+    apiGet<{ log: string }>(`/servers/${serverId}/console`)
+      .then(({ log }) => setLines(log ? log.split("\n") : []))
+      .catch(() => undefined);
+  }, [serverId]);
 
   useRealtime((msg) => {
     if (msg.serverId !== serverId) return;
@@ -93,12 +102,12 @@ export function RconConsole({ serverId, state }: { serverId: string; state: Serv
         </div>
         <div
           ref={boxRef}
-          className="h-80 overflow-y-auto rounded-lg border border-ark-border bg-black/40 p-3 font-mono text-xs leading-relaxed"
+          className="h-80 overflow-y-auto whitespace-pre-wrap break-words rounded-lg border border-ark-border bg-black/40 p-3 font-mono text-xs leading-relaxed"
         >
           {lines.length === 0 ? (
             <span className="text-slate-500">Console output and live logs appear here…</span>
           ) : (
-            lines.map((l, i) => <div key={i}>{l}</div>)
+            lines.join("\n")
           )}
         </div>
         <form onSubmit={send} className="flex gap-2">

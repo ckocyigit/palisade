@@ -16,6 +16,7 @@ import { BackupsModule } from "./backups/backups.module";
 import { NotificationsModule } from "./notifications/notifications.module";
 import { PresetsModule } from "./presets/presets.module";
 import { UpdatesModule } from "./updates/updates.module";
+import { LogCaptureModule } from "./logs/log-capture.module";
 import { HealthController } from "./health/health.controller";
 
 @Module({
@@ -25,6 +26,7 @@ import { HealthController } from "./health/health.controller";
     CryptoModule,
     RealtimeModule,
     EventsModule,
+    LogCaptureModule,
     ManagerSettingsModule,
     DockerModule,
     CatalogModule,

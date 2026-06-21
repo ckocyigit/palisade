@@ -33,6 +33,7 @@ import { InstallerService } from "../installer/installer.service";
 import { RconService } from "../rcon/rcon.service";
 import { StateMachineService } from "./state-machine.service";
 import { ManagerSettingsService } from "../manager-settings/manager-settings.service";
+import { LogCaptureService, LOG_CAPTURE_MAX } from "../logs/log-capture.service";
 import { buildContainerSpec } from "./runtime-spec";
 import { derivePorts, nextBasePort } from "../catalog/ports";
 import { LocalPaths } from "../common/paths";
@@ -99,7 +100,17 @@ export class ServersService implements OnApplicationBootstrap {
     private readonly rcon: RconService,
     private readonly sm: StateMachineService,
     private readonly settings: ManagerSettingsService,
+    private readonly logCapture: LogCaptureService,
   ) {}
+
+  /** The captured log / console for the current run (survives refresh + tab
+   *  switches; wiped on Start). */
+  runLog(id: string): string {
+    return this.logCapture.getLogs(id);
+  }
+  runConsole(id: string): string {
+    return this.logCapture.getConsole(id);
+  }
 
   // ── Startup reconciliation ──────────────────────────────────────────────────
   /** On boot, re-sync DB state + monitors with the Docker reality (see reconcile). */
@@ -590,6 +601,8 @@ export class ServersService implements OnApplicationBootstrap {
         timezone: await this.settings.getTimezone(),
       });
 
+      // Fresh run → wipe the captured log/console so it starts clean.
+      this.logCapture.clear(id);
       // Remove any stale container with the same name, then create+start.
       await this.docker.removeByServerId(id).catch(() => undefined);
       await this.docker.pullImage(spec.Image as string).catch((e) =>
@@ -748,15 +761,26 @@ export class ServersService implements OnApplicationBootstrap {
 
   // ── Monitors: readiness + crash watchdog ────────────────────────────────────
   private async attachMonitors(id: string, containerId: string): Promise<void> {
-    const stop = await this.docker.followLogs(containerId, (line) => {
-      this.realtime.broadcast({
-        topic: RealtimeTopic.ServerLog,
-        serverId: id,
-        payload: { line },
-        at: new Date().toISOString(),
-      });
-      if (READY_RE.test(line)) void this.onReady(id);
-    });
+    // Seed the per-run capture with the current container log (full, capped), then
+    // follow only NEW lines so nothing duplicates. On a fresh start the log is
+    // ~empty (wiping the run); on adopt-after-restart it restores the run's log.
+    const seed = await this.docker.tailLogs(containerId, LOG_CAPTURE_MAX).catch(() => "");
+    this.logCapture.seed(id, seed ? seed.split("\n").filter((l) => l.length > 0) : []);
+
+    const stop = await this.docker.followLogs(
+      containerId,
+      (line) => {
+        this.logCapture.recordLog(id, line);
+        this.realtime.broadcast({
+          topic: RealtimeTopic.ServerLog,
+          serverId: id,
+          payload: { line },
+          at: new Date().toISOString(),
+        });
+        if (READY_RE.test(line)) void this.onReady(id);
+      },
+      0, // only new lines — the seed holds the backlog
+    );
     this.logStops.set(id, stop);
 
     // Crash detection: wait for the container to exit unexpectedly.

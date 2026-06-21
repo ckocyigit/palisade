@@ -5,6 +5,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import { CryptoService } from "../crypto/crypto.service";
 import { EventsService } from "../events/events.service";
 import { RealtimeGateway } from "../realtime/realtime.gateway";
+import { LogCaptureService } from "../logs/log-capture.service";
 import { containerName } from "../common/naming";
 import { loadEnv } from "../config/env";
 
@@ -22,6 +23,7 @@ export class RconService {
     private readonly crypto: CryptoService,
     private readonly events: EventsService,
     private readonly realtime: RealtimeGateway,
+    private readonly logCapture: LogCaptureService,
   ) {}
 
   private async connect(serverId: string): Promise<Rcon> {
@@ -65,6 +67,8 @@ export class RconService {
     try {
       const rcon = await this.connect(serverId);
       const response = await rcon.send(command);
+      this.logCapture.recordConsole(serverId, `> ${command}`);
+      this.logCapture.recordConsole(serverId, response);
       this.realtime.broadcast({
         topic: RealtimeTopic.RconOutput,
         serverId,
