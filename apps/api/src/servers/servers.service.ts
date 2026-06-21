@@ -443,8 +443,21 @@ export class ServersService implements OnApplicationBootstrap {
       }
     };
     applyPassword(existing.adminPasswordEnc, dto.adminPassword, "adminPasswordEnc");
-    applyPassword(existing.serverPasswordEnc, dto.serverPassword, "serverPasswordEnc");
     applyPassword(existing.spectatorPasswordEnc, dto.spectatorPassword, "spectatorPasswordEnc");
+    // Join password is shown in the UI and clearable: an explicit "" REMOVES it
+    // (unlike the secrets above, where "" means "leave unchanged"). Absent = keep.
+    if (dto.serverPassword !== undefined) {
+      let current: string;
+      try {
+        current = existing.serverPasswordEnc ? this.crypto.decrypt(existing.serverPasswordEnc) : "";
+      } catch {
+        current = " "; // undecryptable → force a change
+      }
+      if (dto.serverPassword !== current) {
+        data.serverPasswordEnc = dto.serverPassword ? this.crypto.encrypt(dto.serverPassword) : null;
+        launchChanged = true;
+      }
+    }
     if (dto.config) {
       const merged: ServerConfigValues = {
         ...JSON.parse(existing.configJson),
@@ -902,9 +915,19 @@ export class ServersService implements OnApplicationBootstrap {
 
   private toSummary(row: ServerRow, imageReady = false): ServerSummary {
     if (!row) throw new NotFoundException("Server not found");
-    const serverPassword = (JSON.parse(row.configJson) as ServerConfigValues).values?.[
-      "ServerPassword"
-    ];
+    // Join password is shown so it can be copied for the in-game prompt. Prefer the
+    // plain-text catalog value (ARK's ServerPassword), else fall back to the
+    // first-class encrypted field (how Conan + the create/edit form set it).
+    const catalogPw = (JSON.parse(row.configJson) as ServerConfigValues).values?.["ServerPassword"];
+    let joinPassword: string | null =
+      typeof catalogPw === "string" && catalogPw.trim() ? catalogPw : null;
+    if (!joinPassword && row.serverPasswordEnc) {
+      try {
+        joinPassword = this.crypto.decrypt(row.serverPasswordEnc) || null;
+      } catch {
+        /* undecryptable — treat as unset */
+      }
+    }
     return {
       id: row.id,
       name: row.name,
@@ -917,7 +940,8 @@ export class ServersService implements OnApplicationBootstrap {
       updateAvailable: row.updateAvailable,
       imageReady,
       configDirty: row.configDirty,
-      joinPassword: typeof serverPassword === "string" && serverPassword ? serverPassword : null,
+      joinPassword,
+      hasAdminPassword: Boolean(row.adminPasswordEnc),
       playersOnline: null,
       maxPlayers: row.maxPlayers,
       modIds: JSON.parse(row.modIds) as number[],

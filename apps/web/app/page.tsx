@@ -237,11 +237,13 @@ function CreateServerForm({ onDone }: { onDone: () => void }) {
     map: string;
     maxPlayers: number;
     adminPassword: string;
+    serverPassword: string;
   }>({
     name: "",
     map: maps[0],
     maxPlayers: 70,
     adminPassword: "",
+    serverPassword: "",
   });
   const [busy, setBusy] = useState(false);
 
@@ -310,12 +312,21 @@ function CreateServerForm({ onDone }: { onDone: () => void }) {
             onChange={(e) => setForm((f) => ({ ...f, maxPlayers: Number(e.target.value) }))}
           />
         </div>
-        <div className="md:col-span-2">
+        <div>
           <label className="label">Admin password (enables RCON)</label>
           <input
             className="input"
             value={form.adminPassword}
             onChange={(e) => setForm((f) => ({ ...f, adminPassword: e.target.value }))}
+          />
+        </div>
+        <div>
+          <label className="label">Server password (players need it to join)</label>
+          <input
+            className="input"
+            placeholder="Leave blank for an open server"
+            value={form.serverPassword}
+            onChange={(e) => setForm((f) => ({ ...f, serverPassword: e.target.value }))}
           />
         </div>
       </div>

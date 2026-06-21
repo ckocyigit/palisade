@@ -13,6 +13,7 @@ import { SettingsForm } from "@/components/settings-form";
 import { CopyMenu } from "@/components/copy-menu";
 import { RconConsole } from "@/components/rcon-console";
 import { ResourcesPanel } from "@/components/resources-panel";
+import { ServerAccessCard } from "@/components/server-access-card";
 import { LogsTab } from "@/components/logs-tab";
 import { ScheduleList } from "@/components/schedule-list";
 import { ModsTab } from "@/components/mods-tab";
@@ -197,7 +198,7 @@ export default function ServerDetailPage({ params }: { params: Promise<{ id: str
         ))}
       </div>
 
-      {tab === "Overview" && <Overview server={server} />}
+      {tab === "Overview" && <Overview server={server} onChanged={refresh} />}
       {tab === "Settings" &&
         (config ? (
           <SettingsForm key={configKey} serverId={id} game={server.game} map={server.map} initial={config} />
@@ -213,7 +214,7 @@ export default function ServerDetailPage({ params }: { params: Promise<{ id: str
   );
 }
 
-function Overview({ server }: { server: ServerSummary }) {
+function Overview({ server, onChanged }: { server: ServerSummary; onChanged: () => void }) {
   const rows: [string, string][] = [
     ["Game", server.game],
     ["Map", mapLabel(server.map)],
@@ -250,6 +251,7 @@ function Overview({ server }: { server: ServerSummary }) {
           className="mt-3 max-w-sm"
         />
       </div>
+      <ServerAccessCard server={server} onSaved={onChanged} />
     </div>
   );
 }
