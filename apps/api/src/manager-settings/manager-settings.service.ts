@@ -9,8 +9,12 @@ export const SettingKeys = {
   CurseForgeApiKey: "curseforge_api_key", // secret
   SteamWebApiKey: "steam_web_api_key", // secret
   DiscordWebhook: "discord_webhook_url",
+  BackupKeep: "backup_keep",
   Initialized: "initialized",
 } as const;
+
+/** Default number of backups kept per server (newest N) when unset. */
+export const DEFAULT_BACKUP_KEEP = 10;
 
 const SECRET_KEYS = new Set<string>([SettingKeys.CurseForgeApiKey, SettingKeys.SteamWebApiKey]);
 
@@ -38,6 +42,12 @@ export class ManagerSettingsService {
    *  truth for scheduled-task timing and game-container clocks. */
   async getTimezone(): Promise<string> {
     return (await this.get(SettingKeys.Timezone)) || DEFAULT_TIMEZONE;
+  }
+
+  /** How many backups to keep per server (newest N). Clamped to a sane floor. */
+  async getBackupKeep(): Promise<number> {
+    const n = parseInt((await this.get(SettingKeys.BackupKeep)) ?? "", 10);
+    return Number.isFinite(n) && n >= 1 ? n : DEFAULT_BACKUP_KEEP;
   }
 
   async set(key: string, value: string): Promise<void> {

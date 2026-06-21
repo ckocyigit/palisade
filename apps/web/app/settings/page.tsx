@@ -12,6 +12,7 @@ export default function SettingsPage() {
   const [curseForgeApiKey, setCurseForgeApiKey] = useState("");
   const [steamWebApiKey, setSteamWebApiKey] = useState("");
   const [discordWebhookUrl, setDiscordWebhookUrl] = useState("");
+  const [backupKeep, setBackupKeep] = useState("10");
   const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState(false);
   const [testMsg, setTestMsg] = useState<string | null>(null);
@@ -24,6 +25,7 @@ export default function SettingsPage() {
         // rarely have to touch it.
         setTimezone(typeof v.timezone === "string" && v.timezone ? v.timezone : detectZone());
         if (typeof v.discord_webhook_url === "string") setDiscordWebhookUrl(v.discord_webhook_url);
+        if (typeof v.backup_keep === "string" && v.backup_keep) setBackupKeep(v.backup_keep);
       })
       .catch(() => undefined);
   };
@@ -35,10 +37,12 @@ export default function SettingsPage() {
     setBusy(true);
     setSaved(false);
     try {
-      const settingsBody: Record<string, string> = {};
+      const settingsBody: Record<string, string | number> = {};
       if (timezone) settingsBody.timezone = timezone;
       if (curseForgeApiKey) settingsBody.curseForgeApiKey = curseForgeApiKey;
       if (steamWebApiKey) settingsBody.steamWebApiKey = steamWebApiKey;
+      const keep = parseInt(backupKeep, 10);
+      if (Number.isFinite(keep) && keep >= 1) settingsBody.backupKeep = keep;
       if (Object.keys(settingsBody).length) await apiPatch("/settings", settingsBody);
       await apiPatch("/notifications/webhook", { discordWebhookUrl });
       setCurseForgeApiKey("");
@@ -105,6 +109,25 @@ export default function SettingsPage() {
             </button>
           </div>
           {testMsg && <p className="mt-2 text-sm text-slate-400">{testMsg}</p>}
+        </div>
+      </div>
+
+      <div className="card space-y-4">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-ark-accent2">Backups</h2>
+        <div>
+          <label className="label">Keep last N backups (per server)</label>
+          <input
+            type="number"
+            min={1}
+            max={500}
+            className="input w-32"
+            value={backupKeep}
+            onChange={(e) => setBackupKeep(e.target.value)}
+          />
+          <p className="mt-1 text-xs text-slate-500">
+            Older snapshots beyond this count are deleted automatically. Default 10. Each backup is
+            just the live world, players, and config (ARK&apos;s own dated copies + logs are skipped).
+          </p>
         </div>
       </div>
 

@@ -1,14 +1,31 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { cp, mkdir, rm } from "node:fs/promises";
-import { join } from "node:path";
+import { join, relative, sep } from "node:path";
 import { ServerState, EventType } from "@ark/shared";
 import { PrismaService } from "../prisma/prisma.service";
 import { EventsService } from "../events/events.service";
 import { RconService } from "../rcon/rcon.service";
+import { ManagerSettingsService } from "../manager-settings/manager-settings.service";
 import { LocalPaths } from "../common/paths";
 import { loadEnv } from "../config/env";
 
-const DEFAULT_KEEP = 10;
+// ARK keeps its OWN rolling dated backups (Map_DD.MM.YYYY_HH.MM.SS.{ark,arkrbf}),
+// an anti-corruption .bak, and noisy Logs/Cache dirs. Our snapshot only needs the
+// LIVE world + players + tribes + config — our retention is the rolling history and
+// our cross-snapshot copies are the corruption safety net. Excluding the rest cuts a
+// snapshot from ~1.3 GB to the live world (~tens of MB).
+const ARK_DATED_SAVE = /_\d{2}\.\d{2}\.\d{4}_\d{2}\.\d{2}\.\d{2}\.[a-z0-9]+$/i;
+const SKIP_TOP_DIRS = new Set(["Logs", "Cache"]);
+
+/** Whether a path under Saved/ belongs in a backup. `rel` is relative to Saved.
+ *  Keeps the live world, config, and player/tribe data; drops ARK's dated rolling
+ *  dupes, its anti-corruption .bak, and Logs/Cache. */
+export function includeInBackup(rel: string): boolean {
+  if (!rel) return true; // the Saved root itself
+  if (SKIP_TOP_DIRS.has(rel.split(sep)[0] ?? "")) return false;
+  if (rel.endsWith(".bak")) return false;
+  return !ARK_DATED_SAVE.test(rel);
+}
 
 /**
  * Save backups: on-demand + scheduler-driven pre-action snapshots, with
@@ -22,6 +39,7 @@ export class BackupsService {
     private readonly prisma: PrismaService,
     private readonly events: EventsService,
     private readonly rcon: RconService,
+    private readonly settings: ManagerSettingsService,
   ) {}
 
   list(serverId: string) {
@@ -40,7 +58,10 @@ export class BackupsService {
     const destDir = join(env.DATA_DIR, "backups", serverId);
     const dest = join(destDir, `${reason}-${stamp}`);
     await mkdir(destDir, { recursive: true });
-    await cp(src, dest, { recursive: true }).catch((err) => {
+    await cp(src, dest, {
+      recursive: true,
+      filter: (s) => includeInBackup(relative(src, s)),
+    }).catch((err) => {
       throw new BadRequestException(`Backup failed: ${(err as Error).message}`);
     });
 
@@ -86,8 +107,9 @@ export class BackupsService {
     return { ok: true };
   }
 
-  /** Keep the newest N backups per server; delete the rest (rows + dirs). */
-  private async applyRetention(serverId: string, keep = DEFAULT_KEEP): Promise<void> {
+  /** Keep the newest N backups per server (N from settings); delete the rest. */
+  private async applyRetention(serverId: string): Promise<void> {
+    const keep = await this.settings.getBackupKeep();
     const all = await this.prisma.snapshot.findMany({
       where: { serverId },
       orderBy: { createdAt: "desc" },
