@@ -25,6 +25,48 @@ function demuxLog(buf: Buffer): string {
   return out || buf.toString("utf8"); // fall back if it wasn't framed
 }
 
+export interface ContainerResourceStats {
+  cpuPercent: number;
+  memUsedMb: number;
+  memLimitMb: number;
+}
+
+interface RawStats {
+  cpu_stats?: {
+    cpu_usage?: { total_usage?: number; percpu_usage?: number[] };
+    system_cpu_usage?: number;
+    online_cpus?: number;
+  };
+  precpu_stats?: { cpu_usage?: { total_usage?: number }; system_cpu_usage?: number };
+  memory_stats?: {
+    usage?: number;
+    limit?: number;
+    stats?: { inactive_file?: number; total_inactive_file?: number; cache?: number };
+  };
+}
+
+/** Compute CPU% + memory (used/limit, MB) from a Docker one-shot stats payload —
+ *  mirrors `docker stats`: CPU% from the usage/system deltas × online CPUs, and
+ *  memory = usage minus reclaimable page cache. Returns null if stats are absent. */
+export function computeContainerStats(s: RawStats): ContainerResourceStats | null {
+  const mem = s?.memory_stats;
+  if (!mem || typeof mem.usage !== "number") return null;
+  const cache =
+    mem.stats?.inactive_file ?? mem.stats?.total_inactive_file ?? mem.stats?.cache ?? 0;
+  const memUsed = Math.max(0, mem.usage - cache);
+  const cpuDelta =
+    (s.cpu_stats?.cpu_usage?.total_usage ?? 0) - (s.precpu_stats?.cpu_usage?.total_usage ?? 0);
+  const sysDelta =
+    (s.cpu_stats?.system_cpu_usage ?? 0) - (s.precpu_stats?.system_cpu_usage ?? 0);
+  const cpus = s.cpu_stats?.online_cpus ?? s.cpu_stats?.cpu_usage?.percpu_usage?.length ?? 1;
+  const cpuPercent = sysDelta > 0 && cpuDelta > 0 ? (cpuDelta / sysDelta) * cpus * 100 : 0;
+  return {
+    cpuPercent: Math.round(cpuPercent * 10) / 10,
+    memUsedMb: Math.round(memUsed / 1048576),
+    memLimitMb: Math.round((mem.limit ?? 0) / 1048576),
+  };
+}
+
 /**
  * Thin wrapper over dockerode. Connects to Docker via DOCKER_HOST: the host's
  * unix socket by default (unix:///var/run/docker.sock, mounted into the
@@ -141,6 +183,18 @@ export class DockerService {
    *  track a server rename without a restart). Cosmetic — matched by label. */
   async rename(id: string, name: string): Promise<void> {
     await this.docker.getContainer(id).rename({ name });
+  }
+
+  /** One-shot CPU% + memory (used/limit) for a running container, or null. */
+  async stats(id: string): Promise<ContainerResourceStats | null> {
+    try {
+      const raw = (await this.docker
+        .getContainer(id)
+        .stats({ stream: false })) as unknown as RawStats;
+      return computeContainerStats(raw);
+    } catch {
+      return null;
+    }
   }
 
   /** Remove a server's container(s) by the ark.serverId label — robust to the

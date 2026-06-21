@@ -12,6 +12,7 @@ import { UnofficialListHelp } from "@/components/unofficial-list-help";
 import { SettingsForm } from "@/components/settings-form";
 import { CopyMenu } from "@/components/copy-menu";
 import { RconConsole } from "@/components/rcon-console";
+import { ResourcesPanel } from "@/components/resources-panel";
 import { LogsTab } from "@/components/logs-tab";
 import { ScheduleList } from "@/components/schedule-list";
 import { ModsTab } from "@/components/mods-tab";
@@ -225,27 +226,30 @@ function Overview({ server }: { server: ServerSummary }) {
     ["RAM limit", server.ramLimitMb ? `${server.ramLimitMb} MB` : "unset"],
   ];
   return (
-    <div className="card">
-      <dl className="grid gap-x-8 gap-y-3 sm:grid-cols-2">
-        {rows.map(([k, v]) => (
-          <div key={k} className="flex justify-between gap-4 border-b border-ark-border/50 pb-2">
-            <dt className="text-slate-400">{k}</dt>
-            <dd className="text-right font-medium">{v}</dd>
-          </div>
-        ))}
-      </dl>
-      <ConnectCommand
-        gamePort={server.ports.game}
-        joinPassword={server.joinPassword}
-        className="mt-4 max-w-sm"
-      />
-      <UnofficialListHelp
-        serverName={server.name}
-        mapName={mapLabel(server.map)}
-        hasJoinPassword={Boolean(server.joinPassword)}
-        defaultOpen
-        className="mt-3 max-w-sm"
-      />
+    <div className="space-y-6">
+      <ResourcesPanel serverId={server.id} state={server.state} />
+      <div className="card">
+        <dl className="grid gap-x-8 gap-y-3 sm:grid-cols-2">
+          {rows.map(([k, v]) => (
+            <div key={k} className="flex justify-between gap-4 border-b border-ark-border/50 pb-2">
+              <dt className="text-slate-400">{k}</dt>
+              <dd className="text-right font-medium">{v}</dd>
+            </div>
+          ))}
+        </dl>
+        <ConnectCommand
+          gamePort={server.ports.game}
+          joinPassword={server.joinPassword}
+          className="mt-4 max-w-sm"
+        />
+        <UnofficialListHelp
+          serverName={server.name}
+          mapName={mapLabel(server.map)}
+          hasJoinPassword={Boolean(server.joinPassword)}
+          defaultOpen
+          className="mt-3 max-w-sm"
+        />
+      </div>
     </div>
   );
 }

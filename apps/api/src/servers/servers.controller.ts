@@ -39,6 +39,11 @@ export class ServersController {
     return { log: await this.servers.tailLog(id, n) };
   }
 
+  @Get(":id/stats")
+  stats(@Param("id") id: string) {
+    return this.servers.stats(id);
+  }
+
   @Get(":id/events")
   events_(@Param("id") id: string) {
     return this.events.recent(id);

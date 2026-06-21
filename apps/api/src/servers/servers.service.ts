@@ -6,6 +6,7 @@ import {
   type OnApplicationBootstrap,
 } from "@nestjs/common";
 import { mkdir, writeFile, rm, cp, chmod, chown } from "node:fs/promises";
+import { execFile } from "node:child_process";
 import { join, dirname, relative, sep } from "node:path";
 import {
   Game,
@@ -17,6 +18,7 @@ import {
   type CreateServerDto,
   type UpdateServerDto,
   type ServerSummary,
+  type ServerStats,
   type ServerConfigValues,
 } from "@ark/shared";
 import { PrismaService } from "../prisma/prisma.service";
@@ -74,6 +76,9 @@ export class ServersService implements OnApplicationBootstrap {
    * race the exit).
    */
   private readonly stopping = new Set<string>();
+  /** On-disk instance size (MB), refreshed in the background — `du` is too slow to
+   *  run inline on every stats poll. */
+  private readonly diskCache = new Map<string, { mb: number; at: number }>();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -216,6 +221,50 @@ export class ServersService implements OnApplicationBootstrap {
     if (!server) throw new NotFoundException("Server not found");
     if (!server.containerId) return "";
     return this.docker.tailLogs(server.containerId, tail).catch(() => "");
+  }
+
+  /** Live resource usage: CPU% + memory from Docker (null when not running), and
+   *  the on-disk instance size (cached + background-refreshed). */
+  async stats(id: string): Promise<ServerStats> {
+    const server = await this.prisma.server.findUnique({ where: { id } });
+    if (!server) throw new NotFoundException("Server not found");
+    const running = server.state === ServerState.Running && !!server.containerId;
+    const live = running && server.containerId ? await this.docker.stats(server.containerId) : null;
+    return {
+      running,
+      cpuPercent: live?.cpuPercent ?? null,
+      memUsedMb: live?.memUsedMb ?? null,
+      memLimitMb: live?.memLimitMb ?? null,
+      diskUsedMb: this.diskUsedMb(id),
+    };
+  }
+
+  /** Last-known on-disk instance size (MB), kicking a background refresh when
+   *  stale. Null until the first measurement lands — `du` is too slow to await on
+   *  every poll. */
+  private diskUsedMb(serverId: string): number | null {
+    const cached = this.diskCache.get(serverId);
+    if (!cached || Date.now() - cached.at > 120_000) {
+      void this.computeDiskMb(serverId).then((mb) => {
+        if (mb !== null) this.diskCache.set(serverId, { mb, at: Date.now() });
+      });
+    }
+    return cached?.mb ?? null;
+  }
+
+  private computeDiskMb(serverId: string): Promise<number | null> {
+    return new Promise((resolve) => {
+      execFile(
+        "du",
+        ["-sm", LocalPaths.instanceRoot(serverId)],
+        { timeout: 15_000 },
+        (err, stdout) => {
+          if (err) return resolve(null);
+          const mb = parseInt(stdout.trim().split(/\s+/)[0] ?? "", 10);
+          resolve(Number.isFinite(mb) ? mb : null);
+        },
+      );
+    });
   }
 
   async getConfig(id: string): Promise<ServerConfigValues> {

@@ -32,6 +32,16 @@ export interface ServerSummary {
   updatedAt: string;
 }
 
+/** Live resource usage for a server. CPU/memory are null when not running;
+ *  disk (the on-disk instance size) is null until the first measurement lands. */
+export interface ServerStats {
+  running: boolean;
+  cpuPercent: number | null;
+  memUsedMb: number | null;
+  memLimitMb: number | null;
+  diskUsedMb: number | null;
+}
+
 export interface CreateServerDto {
   name: string;
   game: Game;
