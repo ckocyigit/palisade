@@ -295,9 +295,20 @@ function buildConanSpec(input: RuntimeSpecInput): Docker.ContainerCreateOptions 
     ...conanCatalogEnv(input),
   ];
 
-  // One bind: the whole instance dir → /data (the image lays out /data/server,
-  // /data/steam, /data/backups beneath it; saves at server/ConanSandbox/Saved).
-  const binds = [`${HostPaths.instanceRoot(input.serverId)}:${CONAN_DATA_DIR}`];
+  // Bind the whole instance dir → /data, PLUS each of the image's VOLUME-declared
+  // subdirs explicitly. The image declares `VOLUME /data/server`, `/data/steam`,
+  // `/data/backups`; without explicit binds Docker shadows them with throwaway
+  // anonymous volumes, so the ~4.7GB game install and world saves never reach the
+  // instance dir — lost on every container recreate, invisible to backups and disk
+  // stats. Binding each subdir at its VOLUME path defeats the anonymous volume.
+  // (saves land at server/ConanSandbox/Saved beneath the instance dir.)
+  const root = HostPaths.instanceRoot(input.serverId);
+  const binds = [
+    `${root}:${CONAN_DATA_DIR}`,
+    `${root}/server:${CONAN_DATA_DIR}/server`,
+    `${root}/steam:${CONAN_DATA_DIR}/steam`,
+    `${root}/backups:${CONAN_DATA_DIR}/backups`,
+  ];
 
   const hostNet = env.GAME_HOST_NETWORK;
   return {
