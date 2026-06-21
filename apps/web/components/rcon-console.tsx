@@ -1,7 +1,7 @@
 "use client";
 import { useRef, useState } from "react";
 import { SendHorizontal, Save, Users, RefreshCw } from "lucide-react";
-import { apiPost } from "@/lib/api";
+import { apiGet, apiPost } from "@/lib/api";
 import { useRealtime } from "@/lib/socket";
 
 export function RconConsole({ serverId }: { serverId: string }) {
@@ -38,7 +38,7 @@ export function RconConsole({ serverId }: { serverId: string }) {
 
   const refreshPlayers = async () => {
     try {
-      const { players } = await apiPost<{ players: string[] }>(`/servers/${serverId}/rcon/players`);
+      const { players } = await apiGet<{ players: string[] }>(`/servers/${serverId}/rcon/players`);
       setPlayers(players);
     } catch (err) {
       append(`! ${(err as Error).message}`);
@@ -87,11 +87,18 @@ export function RconConsole({ serverId }: { serverId: string }) {
           <p className="text-sm text-slate-500">No players (or not refreshed).</p>
         ) : (
           <ul className="space-y-2 text-sm">
-            {players.map((p, i) => (
-              <li key={i} className="flex items-center justify-between gap-2">
-                <span className="truncate">{p}</span>
-              </li>
-            ))}
+            {players.map((p, i) => {
+              // ARK lists players as "N. Name, <eos-id>" — show the name, mute the id.
+              const m = p.match(/^\s*\d+\.\s*(.+?),\s*([0-9a-f]{8,})\s*$/i);
+              const name = m ? m[1] : p;
+              const pid = m?.[2];
+              return (
+                <li key={i} className="flex items-center justify-between gap-2">
+                  <span className="truncate font-medium">{name}</span>
+                  {pid && <span className="shrink-0 font-mono text-xs text-slate-500">{pid}</span>}
+                </li>
+              );
+            })}
           </ul>
         )}
       </div>
