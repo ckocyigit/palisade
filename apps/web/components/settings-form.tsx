@@ -20,6 +20,7 @@ import {
   Network,
   Wrench,
   Sparkles,
+  Clock,
   Map as MapIcon,
   type LucideIcon,
 } from "lucide-react";
@@ -28,9 +29,9 @@ import {
   mapLabel,
   SETTINGS_PRESETS,
   settingActive,
+  Game,
   type SettingsPreset,
   type CustomPreset,
-  type Game,
   type SettingsCatalog,
   type SettingDef,
   type ServerConfigValues,
@@ -81,11 +82,13 @@ const numBox =
   "w-16 shrink-0 rounded border border-ark-border bg-ark-bg px-1.5 py-1 text-right text-sm outline-none focus:border-ark-accent2";
 
 /**
- * Settings are grouped into top-level tabs so a server's ~270 options aren't one
- * endless scroll. Each tab owns a set of catalog categories; any category not
- * listed here falls into "Advanced" so nothing is ever hidden.
+ * Settings are grouped into top-level tabs so a server's options aren't one endless
+ * scroll. Each tab owns a set of catalog categories; the set is game-specific (ARK
+ * and Conan have entirely different categories). For ARK, any category not listed
+ * here falls into "Advanced" so nothing is ever hidden.
  */
-const GROUPS: { id: string; label: string; Icon: LucideIcon; cats: string[] }[] = [
+type SettingGroup = { id: string; label: string; Icon: LucideIcon; cats: string[] };
+const ARK_GROUPS: SettingGroup[] = [
   { id: "general", label: "General", Icon: SlidersHorizontal, cats: ["Rules", "Server", "Chat", "Difficulty", "Time & weather", "Active seasonal event", "Server language override", "Crossplay platforms"] },
   { id: "rates", label: "Rates & XP", Icon: Gauge, cats: ["Rates", "XP breakdown", "Crops & farming", "Spoiling & decay"] },
   { id: "players", label: "Players", Icon: User, cats: ["Players", "Leveling"] },
@@ -98,7 +101,19 @@ const GROUPS: { id: string; label: string; Icon: LucideIcon; cats: string[] }[] 
   { id: "cluster", label: "Cluster", Icon: Network, cats: ["Cross-server"] },
   { id: "advanced", label: "Advanced", Icon: Wrench, cats: ["Launch options", "Launch flags"] },
 ];
-const MAPPED_CATS = new Set(GROUPS.flatMap((g) => g.cats));
+
+// Conan's catalog categories map to their own tabs (it has no maps / per-level
+// stats / engrams). Every Conan category is covered here, so there's no Advanced
+// catch-all (and no ARK-style raw-ini passthrough, which Conan doesn't use).
+const CONAN_GROUPS: SettingGroup[] = [
+  { id: "general", label: "General", Icon: SlidersHorizontal, cats: ["General", "PvP & Rules"] },
+  { id: "combat", label: "Combat", Icon: Swords, cats: ["Combat"] },
+  { id: "survival", label: "Survival", Icon: User, cats: ["Survival", "Death"] },
+  { id: "progression", label: "Rates & XP", Icon: Gauge, cats: ["Progression", "Harvest & Crafting"] },
+  { id: "world", label: "World", Icon: PawPrint, cats: ["World", "Thralls", "Avatars"] },
+  { id: "building", label: "Building", Icon: Building2, cats: ["Building", "Clans"] },
+  { id: "schedules", label: "Schedules", Icon: Clock, cats: ["Schedules"] },
+];
 
 /**
  * Map-specific categories → fragments of the server's map name they apply to.
@@ -136,6 +151,10 @@ export function SettingsForm({
   map: string;
   initial: ServerConfigValues;
 }) {
+  // Tabs + their category membership are game-specific.
+  const GROUPS = game === Game.CONAN ? CONAN_GROUPS : ARK_GROUPS;
+  const MAPPED_CATS = new Set(GROUPS.flatMap((g) => g.cats));
+
   // A map-specific category is shown only when the server's map matches it.
   const mapMatches = (cat: string): boolean => {
     const frags = MAP_CATEGORIES[cat];
