@@ -5,6 +5,7 @@ import { ServerState, EventType } from "@ark/shared";
 import { PrismaService } from "../prisma/prisma.service";
 import { EventsService } from "../events/events.service";
 import { RconService } from "../rcon/rcon.service";
+import { LocalPaths } from "../common/paths";
 import { loadEnv } from "../config/env";
 
 const DEFAULT_KEEP = 10;
@@ -35,7 +36,7 @@ export class BackupsService {
     const env = loadEnv();
     await this.rcon.saveWorld(serverId).catch(() => undefined);
     const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-    const src = join(env.DATA_DIR, "instances", serverId, "Saved");
+    const src = LocalPaths.savedDir(serverId); // ShooterGame/Saved — the actual world
     const destDir = join(env.DATA_DIR, "backups", serverId);
     const dest = join(destDir, `${reason}-${stamp}`);
     await mkdir(destDir, { recursive: true });
@@ -56,7 +57,6 @@ export class BackupsService {
 
   /** Restore a backup over the instance Saved dir. Server must be stopped. */
   async restore(serverId: string, snapshotId: string) {
-    const env = loadEnv();
     const server = await this.prisma.server.findUnique({ where: { id: serverId } });
     if (!server) throw new NotFoundException("Server not found");
     if (![ServerState.Stopped, ServerState.Crashed].includes(server.state as ServerState)) {
@@ -65,7 +65,7 @@ export class BackupsService {
     const snap = await this.prisma.snapshot.findUnique({ where: { id: snapshotId } });
     if (!snap) throw new NotFoundException("Backup not found");
 
-    const dest = join(env.DATA_DIR, "instances", serverId, "Saved");
+    const dest = LocalPaths.savedDir(serverId); // ShooterGame/Saved — the actual world
     // Snapshot the current state first so a restore is itself reversible.
     await this.create(serverId, "pre-restore").catch(() => undefined);
     await rm(dest, { recursive: true, force: true });

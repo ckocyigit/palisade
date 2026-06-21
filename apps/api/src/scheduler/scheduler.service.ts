@@ -1,6 +1,6 @@
 import { Injectable, Logger, OnModuleInit, BadRequestException } from "@nestjs/common";
 import * as cron from "node-cron";
-import { EventType } from "@ark/shared";
+import { EventType, ServerState, Game } from "@ark/shared";
 import { PrismaService } from "../prisma/prisma.service";
 import { EventsService } from "../events/events.service";
 import { ServersService } from "../servers/servers.service";
@@ -93,13 +93,19 @@ export class SchedulerService implements OnModuleInit {
         case "backup":
           await this.backups.create(sched.serverId, "scheduled").catch(() => undefined);
           break;
-        case "update":
-          await this.servers.stop(sched.serverId).catch(() => undefined);
-          await this.installer.install(
-            (await this.prisma.server.findUnique({ where: { id: sched.serverId } }))!.game as never,
-            { serverId: sched.serverId },
+        case "update": {
+          const server = await this.prisma.server.findUnique({ where: { id: sched.serverId } });
+          if (!server) break;
+          // Only bring it back up if it was up — don't start a server the admin
+          // had deliberately stopped.
+          const wasUp = [ServerState.Running, ServerState.Starting].includes(
+            server.state as ServerState,
           );
+          await this.servers.stop(sched.serverId).catch(() => undefined);
+          await this.installer.install(server.game as Game, { serverId: sched.serverId });
+          if (wasUp) await this.servers.start(sched.serverId);
           break;
+        }
       }
     } catch (err) {
       await this.events.emit({

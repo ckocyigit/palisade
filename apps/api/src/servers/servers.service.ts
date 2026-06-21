@@ -279,8 +279,7 @@ export class ServersService implements OnApplicationBootstrap {
   ): Promise<ServerSummary> {
     const summary = await this.create(dto);
     if (savedSourcePath) {
-      const env = loadEnv();
-      const dest = join(env.DATA_DIR, "instances", summary.id, "Saved");
+      const dest = LocalPaths.savedDir(summary.id); // ShooterGame/Saved
       await mkdir(dirname(dest), { recursive: true });
       await cp(savedSourcePath, dest, { recursive: true }).catch((err) => {
         throw new BadRequestException(`Import copy failed: ${(err as Error).message}`);

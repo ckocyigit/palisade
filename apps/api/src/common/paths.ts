@@ -30,6 +30,15 @@ export const LocalPaths = {
   instanceRoot(serverId: string): string {
     return `${loadEnv().DATA_DIR}/instances/${serverId}`;
   },
+  /**
+   * The ARK world save dir inside an instance — the world, configs, player
+   * profiles, and tribes. BOTH POK/ASA and hermsi/ASE store saves under
+   * `ShooterGame/Saved`, NOT the instance root. Backup, restore, and import all
+   * operate on this; pointing them at the root finds nothing (ENOENT).
+   */
+  savedDir(serverId: string): string {
+    return `${this.instanceRoot(serverId)}/ShooterGame/Saved`;
+  },
   /** Warmed golden copy of a game's files, reflink-cloned into each instance. */
   gameCache(game: Game): string {
     return `${loadEnv().DATA_DIR}/cache/${game.toLowerCase()}`;
