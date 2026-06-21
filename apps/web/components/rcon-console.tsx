@@ -1,10 +1,13 @@
 "use client";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { SendHorizontal, Save, Users, RefreshCw } from "lucide-react";
+import { ServerState } from "@ark/shared";
 import { apiGet, apiPost } from "@/lib/api";
 import { useRealtime } from "@/lib/socket";
 
-export function RconConsole({ serverId }: { serverId: string }) {
+const PLAYER_POLL_MS = 20_000;
+
+export function RconConsole({ serverId, state }: { serverId: string; state: ServerState }) {
   const [lines, setLines] = useState<string[]>([]);
   const [command, setCommand] = useState("");
   const [players, setPlayers] = useState<string[]>([]);
@@ -36,6 +39,7 @@ export function RconConsole({ serverId }: { serverId: string }) {
     }
   };
 
+  // Manual refresh (button): surfaces errors in the console.
   const refreshPlayers = async () => {
     try {
       const { players } = await apiGet<{ players: string[] }>(`/servers/${serverId}/rcon/players`);
@@ -44,6 +48,37 @@ export function RconConsole({ serverId }: { serverId: string }) {
       append(`! ${(err as Error).message}`);
     }
   };
+
+  // Auto-refresh: load on open, then poll while the server is Running and the tab
+  // is visible (and re-poll the moment it's refocused). Silent — auto-poll errors
+  // don't spam the console. Clears the list when the server isn't Running.
+  useEffect(() => {
+    if (state !== ServerState.Running) {
+      setPlayers([]);
+      return;
+    }
+    let cancelled = false;
+    const tick = async () => {
+      if (document.hidden) return;
+      try {
+        const { players } = await apiGet<{ players: string[] }>(`/servers/${serverId}/rcon/players`);
+        if (!cancelled) setPlayers(players);
+      } catch {
+        /* silent: don't spew poll errors into the console */
+      }
+    };
+    void tick(); // load on open
+    const id = setInterval(() => void tick(), PLAYER_POLL_MS);
+    const onVisible = () => {
+      if (!document.hidden) void tick();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [serverId, state]);
 
   return (
     <div className="grid gap-4 lg:grid-cols-3">
@@ -82,9 +117,16 @@ export function RconConsole({ serverId }: { serverId: string }) {
       <div className="card">
         <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold">
           <Users className="h-4 w-4" /> Players
+          {state === ServerState.Running && (
+            <span className="ml-auto text-xs font-normal text-slate-500">
+              live · every {PLAYER_POLL_MS / 1000}s
+            </span>
+          )}
         </h3>
         {players.length === 0 ? (
-          <p className="text-sm text-slate-500">No players (or not refreshed).</p>
+          <p className="text-sm text-slate-500">
+            {state === ServerState.Running ? "No players connected." : "Server isn’t running."}
+          </p>
         ) : (
           <ul className="space-y-2 text-sm">
             {players.map((p, i) => {
