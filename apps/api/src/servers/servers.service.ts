@@ -63,11 +63,15 @@ type ServerRow = Awaited<ReturnType<PrismaService["server"]["findUnique"]>> & {
 // `. (NN.NGB Mem)`), so rejecting a trailing single-quote after "join" tells the
 // two apart, whether we test one line or a multi-line blob.
 //
-// Conan (acekorneya/conan_enhanced_server): the image's wrapper logs `Conan server
-// process started` reliably to stdout. TODO(conan): this fires at process start,
-// not when the world finishes loading — refine to the true "ready" line once we've
-// watched a real Conan boot (the thin-slice live-verify item).
-export const READY_RE = /(advertising for join(?!')|server is up|Conan server process started)/i;
+// Conan (acekorneya/conan_enhanced_server): the game logs a one-shot
+// `LogServerStats: Startup report. StartupTime=N ... Region=...` exactly when
+// startup completes — after the ~30s world load that follows "Rcon is ready" and
+// engine init, right as SourceServerQueries opens the query port. That's the true
+// joinable moment (verified against a real Conan boot); the earlier RCON/engine-init
+// lines fire ~30s too soon. The `StartupTime=` format is Conan-specific, so it
+// won't misfire on ARK.
+export const READY_RE =
+  /(advertising for join(?!')|server is up|Startup report\. StartupTime=)/i;
 const CRASH_WINDOW_MS = 5 * 60_000;
 const CRASH_LIMIT = 3;
 
@@ -431,7 +435,7 @@ export class ServersService implements OnApplicationBootstrap {
       try {
         current = enc ? this.crypto.decrypt(enc) : "";
       } catch {
-        current = " "; // undecryptable → treat as a change
+        current = ""; // undecryptable → treat as a change
       }
       if (next !== current) {
         data[field] = this.crypto.encrypt(next);

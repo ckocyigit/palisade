@@ -32,6 +32,24 @@ describe("READY_RE startup marker", () => {
     expect(READY_RE.test("[arkmanager] server is up")).toBe(true);
   });
 
+  // Conan (acekorneya): the "Startup report" line fires once when startup
+  // completes; the earlier RCON-ready / engine-init lines (~30s sooner) must not.
+  const REAL_CONAN =
+    "[2026.06.21-21.55.53:143][  0]LogServerStats: Startup report. StartupTime=36 Name=Krusty the Barbarian Map=ConanSandbox QueryPort=7779 Type=1 Region=1 MaxPlayers=70";
+
+  it("matches the real Conan 'Startup report' completion line", () => {
+    expect(READY_RE.test(REAL_CONAN)).toBe(true);
+  });
+
+  it("does NOT flip on Conan's earlier RCON-ready / engine-init lines", () => {
+    expect(
+      READY_RE.test("[  0]LogRcon: Display: Rcon is ready for client connections on 0.0.0.0:7780!"),
+    ).toBe(false);
+    expect(
+      READY_RE.test("[  0]LogInit: Display: Engine is initialized. Leaving FEngineLoop::Init()"),
+    ).toBe(false);
+  });
+
   it("on a multi-line blob, is ready only once the advertising line appears", () => {
     const earlyBlob = `${WAITING}\nServer has successfully started!\nFull Startup: 112.34 seconds`;
     expect(READY_RE.test(earlyBlob)).toBe(false);
