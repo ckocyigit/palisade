@@ -733,7 +733,11 @@ export class ServersService implements OnApplicationBootstrap {
     containerId: string | null,
     timeoutMs = 30_000,
   ): Promise<void> {
-    if (!containerId) {
+    // Conan persists to a SQLite DB and never logs "World Save Complete" — issue its
+    // save (DoServerSaveAll, via the game-aware wrapper) and return; SIGTERM flushes
+    // the DB on shutdown. Waiting for the ARK log here would just burn the timeout.
+    const row = await this.prisma.server.findUnique({ where: { id }, select: { game: true } });
+    if (!containerId || (row?.game as Game) === Game.CONAN) {
       await this.rcon.saveWorld(id).catch(() => undefined);
       return;
     }

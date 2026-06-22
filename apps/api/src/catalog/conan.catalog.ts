@@ -8,13 +8,14 @@ import { Game, SettingTarget, type SettingsCatalog, type SettingDef } from "@ark
  * Two kinds of settings:
  *  - First-class: env vars the image's configure-server.sh maps explicitly to an ini
  *    key (e.g. XP_RATE_MULTIPLIER -> PlayerXPRateMultiplier). Built with `cset`.
- *  - Raw allowlist: any of the image's ~226 allowed ServerSettings keys can be set
- *    via `CONAN_SETTING_<IniKey>`. Built with `rset` (emitAs = CONAN_SETTING_<key>).
+ *    These are always sent (with our defaults, e.g. Region = North America).
+ *  - Raw allowlist: any of the image's ~226 allowed ServerSettings keys, set via
+ *    `CONAN_SETTING_<IniKey>`. Built with `rset`. The runtime serializer only sends
+ *    these when changed from default, so the game keeps its own vanilla default for
+ *    anything the user didn't touch (an approximate default here is harmless).
  *
  * First-class fields handled by the orchestrator (name, passwords, max players,
- * ports, RCON, mods, region of restarts/updates) are NOT here. Only curated
- * gameplay-meaningful keys are listed; the image's internal/version/cache keys are
- * intentionally omitted.
+ * ports, RCON, mods, restarts/updates) are NOT here.
  */
 function cset(
   key: string,
@@ -27,7 +28,8 @@ function cset(
   return { key, label, category, target: SettingTarget.Env, type, default: def, emitAs: key, ...extra };
 }
 
-/** A raw ServerSettings.ini key, delivered via the image's CONAN_SETTING_ override. */
+/** A raw ServerSettings.ini key, delivered via the image's CONAN_SETTING_ override
+ *  (only sent when the user changes it from the default — see conanCatalogEnv). */
 function rset(
   iniKey: string,
   label: string,
@@ -39,7 +41,7 @@ function rset(
   return cset(iniKey, label, category, type, def, { emitAs: `CONAN_SETTING_${iniKey}`, ...extra });
 }
 
-// Common ranges for the many "× multiplier" floats.
+// Common ranges.
 const MULT = { min: 0, max: 10, step: 0.1 } as const;
 const MULT_WIDE = { min: 0, max: 100, step: 0.1 } as const;
 
@@ -78,6 +80,14 @@ const settings: SettingDef[] = [
   rset("ShowOnlinePlayers", "Show online players in browser", "General", "bool", true),
   rset("DisableChatFormatting", "Disable chat formatting", "General", "bool", false),
   rset("AllowFamilySharedAccount", "Allow Steam Family Sharing accounts", "General", "bool", true),
+  rset("EnableLoginQueue", "Login queue when full", "General", "bool", false),
+  rset("EnableTargetLock", "Allow target lock (soft aim)", "General", "bool", true),
+  rset("CreativeModeServer", "Creative mode (admin no-cost build)", "General", "bool", false),
+  rset("PoiProtectionEnabled", "Protect points of interest", "General", "bool", true),
+  rset("ServerTransferEnabled", "Allow character transfer in/out", "General", "bool", false),
+  rset("MaxAllowedPing", "Max allowed ping (0 = no limit)", "General", "int", 0, { min: 0, max: 1000 }),
+  rset("KickAFKTime", "Kick AFK players after (seconds, 0 = never)", "General", "int", 0, { min: 0, max: 86400 }),
+  rset("DisconnectionGraceTime", "Disconnect grace period (seconds)", "General", "int", 120, { min: 0, max: 3600 }),
 
   // ── PvP & rules ────────────────────────────────────────────────────────────
   cset("PVP_ENABLED", "PvP enabled", "PvP & Rules", "bool", true),
@@ -85,6 +95,11 @@ const settings: SettingDef[] = [
     help: "Allow building damage (raiding). Forced on while a building-damage schedule is set.",
   }),
   rset("FriendlyFireDamageMultiplier", "Friendly fire damage ×", "PvP & Rules", "float", 1.0, MULT),
+  rset("DynamicBuildingDamage", "Dynamic building damage", "PvP & Rules", "bool", false, {
+    help: "Buildings only take damage during set periods.",
+  }),
+  rset("DisableBuildingDuringTimeRestrictedPVP", "Block building during PvP hours", "PvP & Rules", "bool", false),
+  rset("bUndermeshDetectionEnabled", "Detect under-mesh exploits", "PvP & Rules", "bool", true),
   cset("ENABLE_BATTLEYE", "BattlEye anti-cheat", "PvP & Rules", "bool", true),
   cset("AVATAR_ENABLED", "Avatars (god summons) enabled", "PvP & Rules", "bool", true),
   cset("MAX_NUDITY", "Max nudity", "PvP & Rules", "enum", "0", {
@@ -110,17 +125,22 @@ const settings: SettingDef[] = [
   rset("BuildingDamageMultiplier", "Building damage ×", "Combat", "float", 1.0, MULT),
   rset("PlayerKnockbackMultiplier", "Player knockback ×", "Combat", "float", 1.0, MULT),
   rset("NPCKnockbackMultiplier", "NPC knockback ×", "Combat", "float", 1.0, MULT),
+  rset("ConciousnessDamageMultiplier", "Knockout (concussion) damage ×", "Combat", "float", 1.0, MULT),
+  rset("PvPMountEnduranceDamageMultiplier", "Mount endurance damage ×", "Combat", "float", 1.0, MULT),
 
   // ── Survival (player rates) ────────────────────────────────────────────────
   cset("PLAYER_HEALTH_REGEN_SPEED_SCALE", "Health regen speed ×", "Survival", "float", 1.0, MULT),
   cset("PLAYER_STAMINA_COST_MULTIPLIER", "Stamina cost ×", "Survival", "float", 1.0, MULT),
   cset("PLAYER_STAMINA_COST_SPRINT_MULTIPLIER", "Sprint stamina cost ×", "Survival", "float", 1.0, MULT),
   rset("PlayerStaminaRegenSpeedScale", "Stamina regen speed ×", "Survival", "float", 1.0, MULT),
+  rset("StaminaStaticRegenRateMultiplier", "Standing stamina regen ×", "Survival", "float", 1.0, MULT),
+  rset("StaminaMovingRegenRateMultiplier", "Moving stamina regen ×", "Survival", "float", 1.0, MULT),
   rset("PlayerMovementSpeedScale", "Movement speed ×", "Survival", "float", 1.0, MULT),
   rset("PlayerSprintSpeedScale", "Sprint speed ×", "Survival", "float", 1.0, MULT),
   rset("PlayerEncumbranceMultiplier", "Carry capacity ×", "Survival", "float", 1.0, MULT),
   rset("PlayerEncumbrancePenaltyMultiplier", "Encumbrance penalty ×", "Survival", "float", 1.0, MULT),
   rset("PlayerCorruptionGainMultiplier", "Corruption gain ×", "Survival", "float", 1.0, MULT),
+  rset("PlayerCorruptionGainFromSorceryMultiplier", "Sorcery corruption gain ×", "Survival", "float", 1.0, MULT),
 
   // ── Progression (XP) ───────────────────────────────────────────────────────
   cset("XP_RATE_MULTIPLIER", "Overall XP ×", "Progression", "float", 1.0, MULT_WIDE),
@@ -147,6 +167,7 @@ const settings: SettingDef[] = [
   rset("AmbientLifeEnabled", "Ambient wildlife", "World", "bool", true),
   rset("EventSystemEnabled", "World events / purge", "World", "bool", true),
   rset("EnableFatalities", "Fatalities (finisher kills)", "World", "bool", true),
+  rset("DogsOfTheDesertSpawnWithDogs", "Dogs of the Desert spawn with dogs", "World", "bool", true),
 
   // ── Death ──────────────────────────────────────────────────────────────────
   cset("DROP_EQUIPMENT_ON_DEATH", "Drop equipment on death", "Death", "enum", "1", {
@@ -164,6 +185,8 @@ const settings: SettingDef[] = [
     ],
   }),
   cset("EVERYBODY_CAN_LOOT_CORPSE", "Anyone can loot corpses", "Death", "bool", true),
+  rset("CorpsesPerPlayer", "Corpses kept per player", "Death", "int", 5, { min: 1, max: 20 }),
+  rset("MaxDeathMapMarkers", "Death map markers kept", "Death", "int", 5, { min: 0, max: 50 }),
 
   // ── Building ───────────────────────────────────────────────────────────────
   cset("ALLOW_BUILDING_ANYWHERE", "Allow building anywhere", "Building", "bool", false),
@@ -172,6 +195,9 @@ const settings: SettingDef[] = [
   rset("StabilityLossMultiplier", "Stability loss ×", "Building", "float", 1.0, MULT),
   rset("LandClaimRadiusMultiplier", "Land-claim radius ×", "Building", "float", 1.0, MULT),
   rset("BuildingDecayTimeMultiplier", "Building decay time ×", "Building", "float", 1.0, MULT),
+  rset("DecayCleanupTimeMultiplier", "Ruined-building cleanup time ×", "Building", "float", 1.0, MULT),
+  rset("DecayShowBuildingScore", "Show decay timer on buildings", "Building", "bool", false),
+  rset("DisableLandclaimNotifications", "Hide land-claim notifications", "Building", "bool", false),
   rset("CampsIgnoreLandclaim", "Camps ignore land claim", "Building", "bool", false),
   rset("ContainersIgnoreOwnership", "Containers ignore ownership", "Building", "bool", false),
 
@@ -184,6 +210,13 @@ const settings: SettingDef[] = [
   rset("ThrallCorruptionRemovalMultiplier", "Thrall corruption removal ×", "Thralls", "float", 1.0, MULT),
   rset("DisableThrallDecay", "Disable thrall/pet decay", "Thralls", "bool", false),
   rset("UseMinionPopulationLimit", "Limit follower population", "Thralls", "bool", false),
+  rset("MinionPopulationBaseValue", "Base follower limit", "Thralls", "int", 50, { min: 0, max: 1000 }),
+  rset("MinionPopulationPerPlayer", "Extra follower limit per player", "Thralls", "int", 0, { min: 0, max: 1000 }),
+  rset("MinionOverpopulationCleanup", "Auto-clean excess followers", "Thralls", "bool", false),
+  rset("EnableFollowerDbno", "Followers down-but-not-out", "Thralls", "bool", false, {
+    help: "Followers fall unconscious instead of dying.",
+  }),
+  rset("EnableFollowerRescueOnLandClaimOnly", "Rescue followers only on your claim", "Thralls", "bool", false),
 
   // ── Avatars ────────────────────────────────────────────────────────────────
   rset("AvatarDomeDamageMultiplier", "Avatar dome damage ×", "Avatars", "float", 1.0, MULT),
@@ -204,4 +237,4 @@ const settings: SettingDef[] = [
   cset("PVP_BUILDING_DAMAGE_END", "Raid end (HH:MM)", "Schedules", "string", ""),
 ];
 
-export const CONAN_CATALOG: SettingsCatalog = { game: Game.CONAN, version: "2", settings };
+export const CONAN_CATALOG: SettingsCatalog = { game: Game.CONAN, version: "3", settings };

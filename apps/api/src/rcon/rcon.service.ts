@@ -104,12 +104,27 @@ export class RconService {
   }
 
   // ── Convenience wrappers ───────────────────────────────────────────────────
-  broadcast(serverId: string, message: string): Promise<string> {
-    return this.exec(serverId, `ServerChat ${message}`);
+  /** The server's game, for picking the right console command syntax. */
+  private async gameOf(serverId: string): Promise<Game> {
+    const s = await this.prisma.server.findUnique({
+      where: { id: serverId },
+      select: { game: true },
+    });
+    if (!s) throw new BadRequestException("Server not found");
+    return s.game as Game;
   }
 
-  saveWorld(serverId: string): Promise<string> {
-    return this.exec(serverId, "SaveWorld");
+  async broadcast(serverId: string, message: string): Promise<string> {
+    // ARK: ServerChat. Conan: broadcast.
+    const game = await this.gameOf(serverId);
+    return this.exec(serverId, game === Game.CONAN ? `broadcast ${message}` : `ServerChat ${message}`);
+  }
+
+  async saveWorld(serverId: string): Promise<string> {
+    // ARK saves the world to .ark files (SaveWorld). Conan persists to a SQLite DB
+    // and flushes it with DoServerSaveAll.
+    const game = await this.gameOf(serverId);
+    return this.exec(serverId, game === Game.CONAN ? "DoServerSaveAll" : "SaveWorld");
   }
 
   doExit(serverId: string): Promise<string> {

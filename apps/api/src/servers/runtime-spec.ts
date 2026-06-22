@@ -251,12 +251,25 @@ function buildAseSpec(input: RuntimeSpecInput): Docker.ContainerCreateOptions {
  *  from these). Bools become true/false; everything else is stringified. */
 function conanCatalogEnv(input: RuntimeSpecInput): string[] {
   const out: string[] = [];
+  const str = (v: unknown) => (typeof v === "boolean" ? (v ? "true" : "false") : String(v));
   for (const def of input.catalog.settings) {
     if (def.target !== SettingTarget.Env) continue;
-    const raw = input.config.values?.[def.key] ?? def.default;
-    if (raw === undefined || raw === null) continue;
-    const val = typeof raw === "boolean" ? (raw ? "true" : "false") : String(raw);
-    out.push(`${def.emitAs ?? def.key}=${val}`);
+    const emitAs = def.emitAs ?? def.key;
+    const set = input.config.values?.[def.key];
+    // Raw ServerSettings overrides (CONAN_SETTING_*) are only sent when the user
+    // changed them from the catalog default — so the game keeps its own vanilla
+    // default for every untouched knob, and an approximate catalog default can
+    // never silently change server behavior. First-class env vars always send
+    // (they mirror the image's own keys + our opinionated defaults, e.g. Region).
+    if (emitAs.startsWith("CONAN_SETTING_")) {
+      if (set === undefined || set === null) continue;
+      if (JSON.stringify(set) === JSON.stringify(def.default)) continue;
+      out.push(`${emitAs}=${str(set)}`);
+    } else {
+      const raw = set ?? def.default;
+      if (raw === undefined || raw === null) continue;
+      out.push(`${emitAs}=${str(raw)}`);
+    }
   }
   return out;
 }
