@@ -1,6 +1,6 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from "@nestjs/common";
 import { IsArray, IsBoolean, IsEnum, IsInt, IsOptional, IsString } from "class-validator";
-import { Game, type ModSort } from "@ark/shared";
+import { Game, workshopAppId, type ModSort } from "@ark/shared";
 import { CurseForgeService } from "./curseforge.service";
 import { SteamService } from "./steam.service";
 import { FavoritesService } from "./favorites.service";
@@ -36,7 +36,7 @@ export class ModsController {
     private readonly favorites: FavoritesService,
   ) {}
 
-  /** Mod browser — CurseForge for ASA, Steam Workshop for ASE. */
+  /** Mod browser — Steam Workshop for ASE/Conan (by app id), CurseForge for ASA. */
   @Get("mods/browse")
   browse(
     @Query("query") query = "",
@@ -46,15 +46,16 @@ export class ModsController {
     @Query("gameVersion") gameVersion?: string,
     @Query("categoryId") categoryId?: string,
   ) {
-    return game === Game.ASE
-      ? this.steam.search(query, Number(page), sort)
+    const appId = workshopAppId(game);
+    return appId
+      ? this.steam.search(query, Number(page), sort, appId)
       : this.curseforge.search(query, Number(page), sort, { gameVersion, categoryId });
   }
 
-  /** Categories for the browser's filter (CurseForge only; ASE has none). */
+  /** Categories for the browser's filter (CurseForge only; Workshop has none). */
   @Get("mods/categories")
   categories(@Query("game") game: Game = Game.ASA) {
-    return game === Game.ASE ? [] : this.curseforge.categories();
+    return workshopAppId(game) ? [] : this.curseforge.categories();
   }
 
   // ── Favorites (global per game) ────────────────────────────────────────────
@@ -79,7 +80,7 @@ export class ModsController {
 
   @Get("mods/:remoteId")
   details(@Param("remoteId") remoteId: string, @Query("game") game: Game = Game.ASA) {
-    return game === Game.ASE
+    return workshopAppId(game)
       ? this.steam.details(Number(remoteId))
       : this.curseforge.details(Number(remoteId));
   }

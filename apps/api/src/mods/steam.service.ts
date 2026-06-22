@@ -39,10 +39,15 @@ export class SteamService {
     return key;
   }
 
-  async search(query: string, page = 0, sort: ModSort = "relevance"): Promise<ModSearchResult[]> {
+  async search(
+    query: string,
+    page = 0,
+    sort: ModSort = "relevance",
+    appId: number = ASE_WORKSHOP_APP_ID,
+  ): Promise<ModSearchResult[]> {
     const params = new URLSearchParams({
       key: await this.key(),
-      appid: String(ASE_WORKSHOP_APP_ID),
+      appid: String(appId),
       search_text: query,
       numperpage: String(MOD_PAGE_SIZE),
       page: String(page + 1),

@@ -22,8 +22,18 @@ export const STEAM_APP_ID: Record<Game, number> = {
   [Game.CONAN]: 443030,
 };
 
-/** Steam Workshop "consumer" app id used for ASE mod downloads. */
+/** Steam Workshop "consumer" app ids for mod downloads (ARK: Survival Evolved /
+ *  Conan Exiles). ASA uses CurseForge instead, so it has no Workshop app id. */
 export const ASE_WORKSHOP_APP_ID = 346110;
+export const CONAN_WORKSHOP_APP_ID = 440900;
+
+/** The Steam Workshop app id for a game, or undefined for CurseForge games (ASA).
+ *  Doubles as the "is this a Workshop game?" check across the mods code. */
+export function workshopAppId(game: Game): number | undefined {
+  if (game === Game.ASE) return ASE_WORKSHOP_APP_ID;
+  if (game === Game.CONAN) return CONAN_WORKSHOP_APP_ID;
+  return undefined;
+}
 
 /**
  * Per-game icons (Steam store headers — stable CDN URLs). Used for the spawned

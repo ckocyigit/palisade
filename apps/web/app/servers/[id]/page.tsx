@@ -239,7 +239,9 @@ function Overview({ server, onChanged }: { server: ServerSummary; onChanged: () 
           ))}
         </dl>
         <ConnectCommand
+          game={server.game}
           gamePort={server.ports.game}
+          queryPort={server.ports.query}
           joinPassword={server.joinPassword}
           className="mt-4 max-w-sm"
         />
