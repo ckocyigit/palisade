@@ -181,7 +181,11 @@ describe("buildContainerSpec (Conan)", () => {
   });
 });
 
-async function buildMinecraft(config: ServerConfigValues, ramLimitMb: number | null = null) {
+async function buildMinecraft(
+  config: ServerConfigValues,
+  ramLimitMb: number | null = null,
+  curseForgeApiKey: string | null = null,
+) {
   const { buildContainerSpec } = await import("./runtime-spec");
   const { MINECRAFT_CATALOG } = await import("../catalog/minecraft.catalog");
   return buildContainerSpec({
@@ -198,6 +202,7 @@ async function buildMinecraft(config: ServerConfigValues, ramLimitMb: number | n
     config,
     catalog: MINECRAFT_CATALOG,
     ramLimitMb,
+    curseForgeApiKey,
   });
 }
 
@@ -232,5 +237,26 @@ describe("buildContainerSpec (Minecraft / itzg)", () => {
     expect(env).toContain("DIFFICULTY=hard");
     expect(env).toContain("PVP=false");
     expect(env.some((e) => e.startsWith("SEED="))).toBe(false); // empty SEED is dropped
+  });
+
+  it("switches to AUTO_CURSEFORGE for a modpack, suppressing the catalog TYPE/VERSION", async () => {
+    const env = envOf(
+      await buildMinecraft(
+        { values: { _mcModpackSlug: "all-the-mods-10", _mcModpackFileId: 12345, TYPE: "PAPER" } },
+        null,
+        "cf-key-abc",
+      ),
+    );
+    expect(env).toContain("TYPE=AUTO_CURSEFORGE");
+    expect(env).toContain("CF_API_KEY=cf-key-abc");
+    expect(env).toContain("CF_SLUG=all-the-mods-10");
+    expect(env).toContain("CF_FILE_ID=12345");
+    expect(env).not.toContain("TYPE=PAPER"); // the catalog flavour is overridden by the pack
+  });
+
+  it("ignores a modpack slug when no CurseForge key is available (stays vanilla)", async () => {
+    const env = envOf(await buildMinecraft({ values: { _mcModpackSlug: "all-the-mods-10" } }, null, null));
+    expect(env.some((e) => e.startsWith("CF_SLUG="))).toBe(false);
+    expect(env).not.toContain("TYPE=AUTO_CURSEFORGE");
   });
 });

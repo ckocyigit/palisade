@@ -64,6 +64,20 @@ export const GAME_ICONS: Record<Game, string> = {
 /** CurseForge numeric game id for ASA (used by the mod browser). */
 export const ASA_CURSEFORGE_GAME_ID = 83374;
 
+/** CurseForge numeric game id for Minecraft, and the "Modpacks" class id — the
+ *  Minecraft mods tab browses modpacks (itzg installs them via AUTO_CURSEFORGE). */
+export const MINECRAFT_CURSEFORGE_GAME_ID = 432;
+export const MINECRAFT_CURSEFORGE_MODPACK_CLASS_ID = 4471;
+
+/** CurseForge game id + (optional) class id for a game's mod browser, or undefined
+ *  for non-CurseForge games. ASA browses all classes; Minecraft browses modpacks. */
+export function curseforgeBrowse(game: Game): { gameId: number; classId?: number } | undefined {
+  if (game === Game.ASA) return { gameId: ASA_CURSEFORGE_GAME_ID };
+  if (game === Game.MINECRAFT)
+    return { gameId: MINECRAFT_CURSEFORGE_GAME_ID, classId: MINECRAFT_CURSEFORGE_MODPACK_CLASS_ID };
+  return undefined;
+}
+
 /**
  * Rough expected RAM (MB) for a populated server of each game — used by the start
  * guard to warn before a start would exceed free host RAM. Grounded in real usage

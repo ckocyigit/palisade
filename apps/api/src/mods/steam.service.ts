@@ -101,6 +101,7 @@ interface SteamFile {
 function toResult(f: SteamFile): ModSearchResult {
   return {
     remoteId: Number(f.publishedfileid),
+    slug: null, // Workshop items have no CurseForge-style slug
     name: f.title ?? `Workshop ${f.publishedfileid}`,
     summary: f.short_description ?? stripMarkup(f.file_description ?? f.description).slice(0, 200),
     thumbnailUrl: f.preview_url ?? null,

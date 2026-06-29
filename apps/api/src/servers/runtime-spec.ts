@@ -39,6 +39,8 @@ export interface RuntimeSpecInput {
   cpuLimit?: number | null;
   /** IANA timezone for the game container clock; falls back to the manager's TZ. */
   timezone?: string | null;
+  /** CurseForge API key (Minecraft only) — lets itzg auto-install a modpack. */
+  curseForgeApiKey?: string | null;
 }
 
 /** Build the Docker create spec for a game-server container. */
@@ -473,6 +475,18 @@ function buildMinecraftSpec(input: RuntimeSpecInput): Docker.ContainerCreateOpti
   // metaspace + the OS); fall back to 3 GB when the server has no explicit cap.
   const heapMb = input.ramLimitMb ? Math.max(1024, Math.floor(input.ramLimitMb * 0.8)) : 3072;
 
+  // A selected CurseForge modpack (stored in config by the Mods tab) switches the
+  // image to AUTO_CURSEFORGE: it downloads the pack + loader + every mod using the
+  // user's API key. The pack dictates the server flavour + MC version, so the
+  // catalog's TYPE/VERSION are suppressed in favour of the modpack's.
+  const slug = input.config.values?.["_mcModpackSlug"] as string | undefined;
+  const fileId = input.config.values?.["_mcModpackFileId"];
+  const usingModpack = Boolean(slug && input.curseForgeApiKey);
+
+  const catalogEnv = minecraftCatalogEnv(input).filter(
+    (e) => !usingModpack || (!e.startsWith("TYPE=") && !e.startsWith("VERSION=")),
+  );
+
   const mcEnv = [
     `TZ=${input.timezone || env.TZ}`,
     `UID=${env.PUID}`, // itzg reads UID/GID (not PUID/PGID) to own /data
@@ -488,7 +502,15 @@ function buildMinecraftSpec(input: RuntimeSpecInput): Docker.ContainerCreateOpti
     `LEVEL_TYPE=${input.map}`, // world-generation type (e.g. minecraft:normal)
     `LEVEL=world`,
     `MEMORY=${heapMb}M`,
-    ...minecraftCatalogEnv(input),
+    ...catalogEnv,
+    ...(usingModpack
+      ? [
+          `TYPE=AUTO_CURSEFORGE`,
+          `CF_API_KEY=${input.curseForgeApiKey}`,
+          `CF_SLUG=${slug}`,
+          ...(fileId ? [`CF_FILE_ID=${fileId}`] : []),
+        ]
+      : []),
   ];
 
   // One bind covers the jar, config + all worlds (overworld at /data/world).

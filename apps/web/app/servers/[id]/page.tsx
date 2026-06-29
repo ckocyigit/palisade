@@ -220,7 +220,7 @@ export default function ServerDetailPage({ params }: { params: Promise<{ id: str
         (server.game === Game.PALWORLD ? (
           <PalworldModsTab serverId={id} />
         ) : server.game === Game.MINECRAFT ? (
-          <MinecraftModsTab />
+          <MinecraftModsTab serverId={id} />
         ) : (
           <ModsTab serverId={id} game={server.game} />
         ))}

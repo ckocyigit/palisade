@@ -36,7 +36,7 @@ import { CatalogService } from "../catalog/catalog.service";
 import { InstallerService } from "../installer/installer.service";
 import { RconService } from "../rcon/rcon.service";
 import { StateMachineService } from "./state-machine.service";
-import { ManagerSettingsService } from "../manager-settings/manager-settings.service";
+import { ManagerSettingsService, SettingKeys } from "../manager-settings/manager-settings.service";
 import { LogCaptureService, LOG_CAPTURE_MAX } from "../logs/log-capture.service";
 import { buildContainerSpec } from "./runtime-spec";
 import { portsFor } from "../catalog/ports";
@@ -673,6 +673,11 @@ export class ServersService implements OnApplicationBootstrap {
         ramLimitMb: server.ramLimitMb,
         cpuLimit: server.cpuLimit,
         timezone: await this.settings.getTimezone(),
+        // Minecraft only: lets itzg auto-install a selected CurseForge modpack.
+        curseForgeApiKey:
+          (server.game as Game) === Game.MINECRAFT
+            ? await this.settings.get(SettingKeys.CurseForgeApiKey)
+            : null,
       });
 
       // Fresh run → wipe the captured log/console so it starts clean.

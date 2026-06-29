@@ -1,6 +1,6 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Query } from "@nestjs/common";
 import { IsArray, IsBoolean, IsEnum, IsInt, IsOptional, IsString } from "class-validator";
-import { Game, workshopAppId, type ModSort } from "@ark/shared";
+import { Game, workshopAppId, curseforgeBrowse, type ModSort } from "@ark/shared";
 import { CurseForgeService } from "./curseforge.service";
 import { SteamService } from "./steam.service";
 import { FavoritesService } from "./favorites.service";
@@ -26,6 +26,13 @@ class EnabledBody {
 class PinBody {
   @IsOptional() @IsString() version?: string;
 }
+class SetModpackBody {
+  @IsInt() projectId!: number;
+  @IsString() slug!: string;
+  @IsString() name!: string;
+  @IsOptional() @IsString() thumbnailUrl?: string | null;
+  @IsOptional() @IsInt() fileId?: number | null;
+}
 
 @Controller()
 export class ModsController {
@@ -36,7 +43,8 @@ export class ModsController {
     private readonly favorites: FavoritesService,
   ) {}
 
-  /** Mod browser — Steam Workshop for ASE/Conan (by app id), CurseForge for ASA. */
+  /** Mod browser — Steam Workshop for ASE/Conan (by app id), CurseForge for ASA
+   *  (all classes) and Minecraft (Modpacks class). */
   @Get("mods/browse")
   browse(
     @Query("query") query = "",
@@ -47,15 +55,16 @@ export class ModsController {
     @Query("categoryId") categoryId?: string,
   ) {
     const appId = workshopAppId(game);
-    return appId
-      ? this.steam.search(query, Number(page), sort, appId)
-      : this.curseforge.search(query, Number(page), sort, { gameVersion, categoryId });
+    if (appId) return this.steam.search(query, Number(page), sort, appId);
+    const cf = curseforgeBrowse(game) ?? {};
+    return this.curseforge.search(query, Number(page), sort, { ...cf, gameVersion, categoryId });
   }
 
   /** Categories for the browser's filter (CurseForge only; Workshop has none). */
   @Get("mods/categories")
   categories(@Query("game") game: Game = Game.ASA) {
-    return workshopAppId(game) ? [] : this.curseforge.categories();
+    const cf = curseforgeBrowse(game);
+    return cf ? this.curseforge.categories(cf.gameId) : [];
   }
 
   // ── Favorites (global per game) ────────────────────────────────────────────
@@ -121,5 +130,30 @@ export class ModsController {
     @Body() body: PinBody,
   ) {
     return this.mods.setPin(id, modInstallId, body.version ?? null);
+  }
+
+  // ── Minecraft modpacks (itzg AUTO_CURSEFORGE) ──────────────────────────────
+  /** The CurseForge modpack installed on a Minecraft server (or null). */
+  @Get("servers/:id/minecraft/modpack")
+  getModpack(@Param("id") id: string) {
+    return this.mods.getMinecraftModpack(id);
+  }
+
+  /** Install a modpack — the image installs it (loader + mods) on next start. */
+  @Put("servers/:id/minecraft/modpack")
+  setModpack(@Param("id") id: string, @Body() body: SetModpackBody) {
+    return this.mods.setMinecraftModpack(id, {
+      projectId: body.projectId,
+      slug: body.slug,
+      name: body.name,
+      thumbnailUrl: body.thumbnailUrl ?? null,
+      fileId: body.fileId ?? null,
+    });
+  }
+
+  /** Clear the modpack — the server reverts to the configured vanilla/flavour type. */
+  @Delete("servers/:id/minecraft/modpack")
+  clearModpack(@Param("id") id: string) {
+    return this.mods.clearMinecraftModpack(id);
   }
 }

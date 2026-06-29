@@ -1,7 +1,8 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
-import { Game, EventType } from "@ark/shared";
+import { Game, EventType, type ServerConfigValues, type MinecraftModpack } from "@ark/shared";
 import { PrismaService } from "../prisma/prisma.service";
 import { EventsService } from "../events/events.service";
+import { ManagerSettingsService, SettingKeys } from "../manager-settings/manager-settings.service";
 
 export interface AddModInput {
   remoteId: number;
@@ -19,6 +20,7 @@ export class ModsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly events: EventsService,
+    private readonly settings: ManagerSettingsService,
   ) {}
 
   async listInstalled(serverId: string) {
@@ -98,6 +100,88 @@ export class ModsService {
     );
     await this.sync(serverId);
     return this.listInstalled(serverId);
+  }
+
+  // ── Minecraft modpacks (itzg AUTO_CURSEFORGE) ──────────────────────────────
+  // A Minecraft server runs ONE CurseForge modpack (vs ARK's mod list). It's stored
+  // as underscore-prefixed config values and consumed by the runtime spec, which
+  // switches the image to AUTO_CURSEFORGE. These read/write those values.
+
+  /** The installed modpack for a Minecraft server, or null. */
+  async getMinecraftModpack(serverId: string): Promise<MinecraftModpack | null> {
+    const server = await this.prisma.server.findUnique({ where: { id: serverId } });
+    if (!server) throw new NotFoundException("Server not found");
+    const values = (JSON.parse(server.configJson) as ServerConfigValues).values ?? {};
+    const slug = values["_mcModpackSlug"];
+    if (typeof slug !== "string" || !slug) return null;
+    return {
+      projectId: Number(values["_mcModpackProjectId"]) || 0,
+      slug,
+      name: typeof values["_mcModpackName"] === "string" ? values["_mcModpackName"] : slug,
+      thumbnailUrl: typeof values["_mcModpackThumb"] === "string" ? values["_mcModpackThumb"] : null,
+      fileId: values["_mcModpackFileId"] != null ? Number(values["_mcModpackFileId"]) : null,
+    };
+  }
+
+  /** Install a modpack: persist it + flag a restart. itzg downloads it on next start. */
+  async setMinecraftModpack(serverId: string, pack: MinecraftModpack): Promise<MinecraftModpack> {
+    const server = await this.prisma.server.findUnique({ where: { id: serverId } });
+    if (!server) throw new NotFoundException("Server not found");
+    if ((server.game as Game) !== Game.MINECRAFT)
+      throw new BadRequestException("Modpacks are Minecraft-only");
+    // The image downloads the pack itself using the user's CurseForge API key.
+    const key = await this.settings.get(SettingKeys.CurseForgeApiKey);
+    if (!key)
+      throw new BadRequestException(
+        "Add your CurseForge API key in Settings before installing a modpack.",
+      );
+    await this.writeModpackValues(server.id, server.configJson, {
+      _mcModpackSlug: pack.slug,
+      _mcModpackProjectId: pack.projectId,
+      _mcModpackName: pack.name,
+      _mcModpackThumb: pack.thumbnailUrl,
+      _mcModpackFileId: pack.fileId,
+    });
+    await this.events.emit({
+      type: EventType.ConfigChanged,
+      message: `Set modpack: ${pack.name}`,
+      serverId,
+    });
+    return (await this.getMinecraftModpack(serverId))!;
+  }
+
+  /** Remove the modpack — the server reverts to its configured vanilla/flavour type. */
+  async clearMinecraftModpack(serverId: string): Promise<{ ok: true }> {
+    const server = await this.prisma.server.findUnique({ where: { id: serverId } });
+    if (!server) throw new NotFoundException("Server not found");
+    await this.writeModpackValues(server.id, server.configJson, {
+      _mcModpackSlug: undefined,
+      _mcModpackProjectId: undefined,
+      _mcModpackName: undefined,
+      _mcModpackThumb: undefined,
+      _mcModpackFileId: undefined,
+    });
+    await this.events.emit({ type: EventType.ConfigChanged, message: "Cleared modpack", serverId });
+    return { ok: true };
+  }
+
+  /** Merge modpack keys into the server config (undefined deletes a key) + flag restart. */
+  private async writeModpackValues(
+    serverId: string,
+    configJson: string,
+    patch: Record<string, unknown>,
+  ): Promise<void> {
+    const config = JSON.parse(configJson) as ServerConfigValues;
+    const values = { ...(config.values ?? {}) };
+    for (const [k, v] of Object.entries(patch)) {
+      if (v === undefined) delete values[k];
+      else values[k] = v;
+    }
+    config.values = values;
+    await this.prisma.server.update({
+      where: { id: serverId },
+      data: { configJson: JSON.stringify(config), configDirty: true },
+    });
   }
 
   /** Recompute server.modIds = enabled installs, in load order. */

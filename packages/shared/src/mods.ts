@@ -5,6 +5,8 @@ export type ModSort = "relevance" | "popularity" | "downloads" | "updated" | "na
 /** A mod as shown in browse/search result cards. */
 export interface ModSearchResult {
   remoteId: number;
+  /** URL slug — CurseForge only; needed to install a Minecraft modpack (CF_SLUG). */
+  slug: string | null;
   name: string;
   summary: string;
   thumbnailUrl: string | null;
@@ -38,3 +40,17 @@ export interface ModFavorite {
 
 /** Page size used by the browse endpoint; the UI infers "has more" from it. */
 export const MOD_PAGE_SIZE = 20;
+
+/**
+ * The CurseForge modpack installed on a Minecraft server. Stored in the server's
+ * config (underscore-prefixed keys) and consumed by the runtime spec, which switches
+ * the itzg image to TYPE=AUTO_CURSEFORGE and feeds it CF_SLUG/CF_FILE_ID + the key.
+ */
+export interface MinecraftModpack {
+  projectId: number;
+  slug: string;
+  name: string;
+  thumbnailUrl: string | null;
+  /** Pinned file (version) id, or null to let the image install the latest. */
+  fileId: number | null;
+}

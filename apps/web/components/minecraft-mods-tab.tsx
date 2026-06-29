@@ -1,32 +1,216 @@
 "use client";
-import { Boxes, Info } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { Boxes, Search, Download, Trash2, Loader2, Info, ExternalLink } from "lucide-react";
+import { Game, type ModSearchResult, type MinecraftModpack } from "@ark/shared";
+import { apiGet, apiPut, apiDelete, ApiError } from "@/lib/api";
+
+const fmt = (n: number) =>
+  n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : n >= 1_000 ? `${(n / 1_000).toFixed(1)}k` : String(n);
 
 /**
- * Placeholder for Minecraft mods. Minecraft doesn't use Steam Workshop or the ARK
- * CurseForge browser — mods/plugins come from CurseForge/Modrinth modpacks, which
- * the itzg image installs from a pack URL or a dropped jar. That richer flow isn't
- * wired up yet; this sets expectations instead of showing a broken browser.
+ * Minecraft mods = a CurseForge modpack. Browse the Modpacks section, install one,
+ * and the itzg image downloads the pack (loader + every mod) on the next start via
+ * AUTO_CURSEFORGE. Needs the CurseForge API key configured in Settings.
  */
-export function MinecraftModsTab() {
+export function MinecraftModsTab({ serverId }: { serverId: string }) {
+  const [current, setCurrent] = useState<MinecraftModpack | null>(null);
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<ModSearchResult[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [busyId, setBusyId] = useState<number | "clear" | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const loadCurrent = useCallback(() => {
+    apiGet<MinecraftModpack | null>(`/servers/${serverId}/minecraft/modpack`)
+      .then(setCurrent)
+      .catch(() => undefined);
+  }, [serverId]);
+
+  useEffect(() => loadCurrent(), [loadCurrent]);
+
+  const search = useCallback(
+    async (q: string) => {
+      setLoading(true);
+      setError(null);
+      try {
+        const r = await apiGet<ModSearchResult[]>(
+          `/mods/browse?game=${Game.MINECRAFT}&query=${encodeURIComponent(q)}`,
+        );
+        setResults(r);
+      } catch (e) {
+        setError((e as Error).message);
+        setResults([]);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [],
+  );
+
+  // Load popular modpacks on open (empty query → CurseForge returns popular).
+  useEffect(() => void search(""), [search]);
+
+  const install = async (m: ModSearchResult) => {
+    if (!m.slug) {
+      setError("This pack has no installable slug.");
+      return;
+    }
+    setBusyId(m.remoteId);
+    setError(null);
+    try {
+      const saved = await apiPut<MinecraftModpack>(`/servers/${serverId}/minecraft/modpack`, {
+        projectId: m.remoteId,
+        slug: m.slug,
+        name: m.name,
+        thumbnailUrl: m.thumbnailUrl,
+      });
+      setCurrent(saved);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : (e as Error).message);
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const clear = async () => {
+    setBusyId("clear");
+    try {
+      await apiDelete(`/servers/${serverId}/minecraft/modpack`);
+      setCurrent(null);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   return (
-    <div className="card space-y-3">
-      <div className="flex items-center gap-2">
-        <Boxes className="h-5 w-5 text-ark-accent" />
-        <h3 className="font-semibold text-slate-100">Mods &amp; plugins</h3>
+    <div className="space-y-4">
+      <div className="card space-y-3">
+        <div className="flex items-center gap-2">
+          <Boxes className="h-5 w-5 text-ark-accent" />
+          <h3 className="font-semibold text-slate-100">CurseForge modpack</h3>
+        </div>
+        {current ? (
+          <div className="flex items-center gap-3 rounded-md border border-ark-accent/40 bg-ark-bg px-3 py-2">
+            {current.thumbnailUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={current.thumbnailUrl} alt="" className="h-12 w-12 shrink-0 rounded object-cover" />
+            ) : (
+              <Boxes className="h-12 w-12 shrink-0 rounded bg-ark-panel p-2 text-slate-500" />
+            )}
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <span className="truncate font-medium text-slate-100">{current.name}</span>
+                <span className="shrink-0 rounded bg-ark-accent/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-ark-accent">
+                  Installed
+                </span>
+              </div>
+              <div className="text-xs text-slate-500">
+                Installs on next start · restart to apply changes.
+              </div>
+            </div>
+            <button className="btn-secondary shrink-0" onClick={clear} disabled={busyId !== null}>
+              {busyId === "clear" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}{" "}
+              Remove
+            </button>
+          </div>
+        ) : (
+          <p className="text-sm text-slate-400">
+            No modpack — the server runs the type chosen under{" "}
+            <span className="font-mono text-slate-300">Settings → Server</span>. Pick a modpack below to install
+            it (loader + every mod) automatically.
+          </p>
+        )}
       </div>
-      <p className="text-sm text-slate-400">
-        Minecraft mod management is coming next. Choose the server flavour under{" "}
-        <span className="font-mono text-slate-300">Settings → Server → Server type</span> (Paper/Spigot for
-        plugins, Fabric/Forge/NeoForge for mods); modpack and jar installs will land here.
-      </p>
-      <div className="flex items-start gap-2 rounded-md border border-ark-border bg-ark-bg px-3 py-2 text-xs text-slate-500">
-        <Info className="mt-0.5 h-4 w-4 shrink-0" />
-        <span>
-          For now, drop mod/plugin jars into the instance&apos;s{" "}
-          <span className="font-mono">mods/</span> or <span className="font-mono">plugins/</span> folder on the
-          host and restart the server.
-        </span>
-      </div>
+
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          void search(query);
+        }}
+        className="flex gap-2"
+      >
+        <div className="relative flex-1">
+          <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-slate-500" />
+          <input
+            className="input pl-8"
+            placeholder="Search CurseForge modpacks (e.g. All the Mods, Better MC)…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+        </div>
+        <button className="btn-primary" disabled={loading}>
+          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />} Search
+        </button>
+      </form>
+
+      {error && (
+        <div className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+          <Info className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
+
+      {loading && results.length === 0 ? (
+        <div className="flex items-center gap-2 text-sm text-slate-500">
+          <Loader2 className="h-4 w-4 animate-spin" /> Searching…
+        </div>
+      ) : (
+        <div className="grid gap-3 sm:grid-cols-2">
+          {results.map((m) => {
+            const installed = current?.projectId === m.remoteId;
+            return (
+              <div key={m.remoteId} className="card flex gap-3">
+                {m.thumbnailUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={m.thumbnailUrl} alt="" className="h-16 w-16 shrink-0 rounded object-cover" />
+                ) : (
+                  <Boxes className="h-16 w-16 shrink-0 rounded bg-ark-panel p-3 text-slate-500" />
+                )}
+                <div className="flex min-w-0 flex-1 flex-col">
+                  <div className="flex items-start justify-between gap-2">
+                    <span className="truncate font-medium text-slate-100">{m.name}</span>
+                    {m.websiteUrl && (
+                      <a
+                        href={m.websiteUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="shrink-0 text-slate-500 hover:text-slate-300"
+                        title="Open on CurseForge"
+                      >
+                        <ExternalLink className="h-3.5 w-3.5" />
+                      </a>
+                    )}
+                  </div>
+                  <p className="line-clamp-2 text-xs text-slate-400">{m.summary}</p>
+                  <div className="mt-auto flex items-center justify-between gap-2 pt-2">
+                    <span className="text-[11px] text-slate-500">
+                      <Download className="mr-1 inline h-3 w-3" />
+                      {fmt(m.downloadCount)}
+                    </span>
+                    <button
+                      className="btn-secondary"
+                      onClick={() => install(m)}
+                      disabled={busyId !== null || installed || !m.slug}
+                    >
+                      {busyId === m.remoteId ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Download className="h-4 w-4" />
+                      )}{" "}
+                      {installed ? "Installed" : "Install"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+          {!loading && results.length === 0 && !error && (
+            <p className="text-sm text-slate-500">No modpacks found. Try a different search.</p>
+          )}
+        </div>
+      )}
     </div>
   );
 }

@@ -58,13 +58,15 @@ export class CurseForgeService {
     query: string,
     page = 0,
     sort: ModSort = "relevance",
-    opts: { gameVersion?: string; categoryId?: string } = {},
+    opts: { gameId?: number; classId?: number; gameVersion?: string; categoryId?: string } = {},
   ): Promise<ModSearchResult[]> {
     const params = new URLSearchParams({
-      gameId: String(ASA_CURSEFORGE_GAME_ID),
+      gameId: String(opts.gameId ?? ASA_CURSEFORGE_GAME_ID),
       pageSize: String(MOD_PAGE_SIZE),
       index: String(page * MOD_PAGE_SIZE),
     });
+    // classId scopes the search to one section of a game (e.g. Minecraft Modpacks).
+    if (opts.classId) params.set("classId", String(opts.classId));
     if (query) params.set("searchFilter", query);
     // relevance with a query → let CF rank; relevance with no query → popularity.
     const s = CF_SORT[sort] ?? (query ? null : CF_SORT.popularity);
@@ -92,10 +94,10 @@ export class CurseForgeService {
   }
 
   /** Mod categories for the game (for the browser's category filter). */
-  async categories(): Promise<ModCategory[]> {
+  async categories(gameId: number = ASA_CURSEFORGE_GAME_ID): Promise<ModCategory[]> {
     const body = await this.request<{
       data: Array<{ id: number; name: string; isClass?: boolean }>;
-    }>(`/v1/categories?gameId=${ASA_CURSEFORGE_GAME_ID}`);
+    }>(`/v1/categories?gameId=${gameId}`);
     return (body.data ?? [])
       .filter((c) => !c.isClass)
       .map((c) => ({ id: String(c.id), name: c.name }))
@@ -105,6 +107,7 @@ export class CurseForgeService {
 
 interface CfMod {
   id: number;
+  slug?: string;
   name: string;
   summary: string;
   downloadCount: number;
@@ -121,6 +124,7 @@ interface CfMod {
 function toResult(m: CfMod): ModSearchResult {
   return {
     remoteId: m.id,
+    slug: m.slug ?? null,
     name: m.name,
     summary: m.summary,
     thumbnailUrl: m.logo?.thumbnailUrl ?? m.logo?.url ?? null,
