@@ -2,7 +2,7 @@
 import { use, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Play, Square, RotateCw, Download, Loader2, Pencil, Check, X } from "lucide-react";
-import { mapLabel, ServerState, type ServerSummary, type ServerConfigValues } from "@ark/shared";
+import { mapLabel, Game, ServerState, type ServerSummary, type ServerConfigValues } from "@ark/shared";
 import { apiGet, apiPost, apiPatch } from "@/lib/api";
 import { useRealtime } from "@/lib/socket";
 import { StateBadge } from "@/components/state-badge";
@@ -17,6 +17,7 @@ import { ServerAccessCard } from "@/components/server-access-card";
 import { LogsTab } from "@/components/logs-tab";
 import { ScheduleList } from "@/components/schedule-list";
 import { ModsTab } from "@/components/mods-tab";
+import { PalworldModsTab } from "@/components/palworld-mods-tab";
 import { BackupsTab } from "@/components/backups-tab";
 
 const TABS = ["Overview", "Settings", "Mods", "Console", "Logs", "Schedules", "Backups"] as const;
@@ -205,7 +206,12 @@ export default function ServerDetailPage({ params }: { params: Promise<{ id: str
         ) : (
           <div className="text-slate-400">Loading settings…</div>
         ))}
-      {tab === "Mods" && <ModsTab serverId={id} game={server.game} />}
+      {tab === "Mods" &&
+        (server.game === Game.PALWORLD ? (
+          <PalworldModsTab serverId={id} />
+        ) : (
+          <ModsTab serverId={id} game={server.game} />
+        ))}
       {tab === "Console" && <RconConsole serverId={id} game={server.game} state={server.state} />}
       {tab === "Logs" && <LogsTab serverId={id} />}
       {tab === "Schedules" && <ScheduleList serverId={id} />}

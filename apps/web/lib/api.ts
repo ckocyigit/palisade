@@ -53,3 +53,28 @@ export const apiPost = <T>(path: string, body?: unknown) =>
 export const apiPatch = <T>(path: string, body: unknown) =>
   api<T>(path, { method: "PATCH", body: JSON.stringify(body) });
 export const apiDelete = <T>(path: string) => api<T>(path, { method: "DELETE" });
+
+/** Multipart file upload — must NOT set Content-Type (the browser adds the
+ *  multipart boundary itself). Field name is "file" (matches FileInterceptor). */
+export async function apiUpload<T = unknown>(path: string, file: File): Promise<T> {
+  const token = getToken();
+  const form = new FormData();
+  form.append("file", file);
+  const res = await fetch(`/api${path}`, {
+    method: "POST",
+    headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    body: form,
+  });
+  if (!res.ok) {
+    let message = res.statusText;
+    try {
+      const body = await res.json();
+      message = body.message ?? message;
+    } catch {
+      /* ignore */
+    }
+    throw new ApiError(res.status, Array.isArray(message) ? message.join(", ") : message);
+  }
+  const text = await res.text();
+  return (text ? JSON.parse(text) : undefined) as T;
+}

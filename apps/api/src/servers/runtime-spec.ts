@@ -383,6 +383,17 @@ function buildPalworldSpec(input: RuntimeSpecInput): Docker.ContainerCreateOptio
     `UPDATE_ON_BOOT=false`,
     `BACKUP_ENABLED=false`,
     `AUTO_REBOOT_ENABLED=false`,
+    // Server-side mod framework (UE4SS/PalDefender): when enabled, preload its
+    // loader so the native-Linux server injects it. The framework files live in the
+    // bind-mounted Pal/Binaries/Linux (managed via the Mods tab / PalModsService).
+    ...(input.config.values?.["_palFramework"]
+      ? [
+          `LD_PRELOAD=${PALWORLD_DATA_DIR}/${
+            (input.config.values?.["_palFrameworkPreload"] as string) ||
+            "Pal/Binaries/Linux/libUE4SS.so"
+          }`,
+        ]
+      : []),
     ...palworldCatalogEnv(input),
   ];
 

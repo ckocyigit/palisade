@@ -9,9 +9,10 @@ FROM node:20-bookworm-slim AS base
 ENV PNPM_HOME=/pnpm PATH=/pnpm:$PATH
 # openssl + ca-certificates are required by Prisma's query/schema engines (the
 # slim image omits them, which otherwise breaks `prisma migrate deploy` on boot).
-# sqlite3 is used to take consistent online backups of Conan's live world database.
+# sqlite3 is used to take consistent online backups of Conan's live world database;
+# unzip extracts uploaded Palworld .pak/framework archives into the instance dir.
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends openssl ca-certificates sqlite3 \
+  && apt-get install -y --no-install-recommends openssl ca-certificates sqlite3 unzip \
   && rm -rf /var/lib/apt/lists/*
 RUN corepack enable
 WORKDIR /app

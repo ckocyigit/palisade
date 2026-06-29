@@ -11,6 +11,7 @@ import { AuthModule } from "./auth/auth.module";
 import { ServersModule } from "./servers/servers.module";
 import { SchedulerModule } from "./scheduler/scheduler.module";
 import { ModsModule } from "./mods/mods.module";
+import { PalModsModule } from "./palmods/palmods.module";
 import { ClustersModule } from "./clusters/clusters.module";
 import { BackupsModule } from "./backups/backups.module";
 import { NotificationsModule } from "./notifications/notifications.module";
@@ -36,6 +37,7 @@ import { HealthController } from "./health/health.controller";
     ServersModule,
     SchedulerModule,
     ModsModule,
+    PalModsModule,
     ClustersModule,
     BackupsModule,
     NotificationsModule,
