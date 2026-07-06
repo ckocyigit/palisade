@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { ServerState } from "@ark/shared";
+import { Game, ServerState } from "@ark/shared";
 import { ServersService } from "./servers.service";
 
 // Reconcile decision logic with stubbed deps. We assert how DB state + monitors
 // are snapped to the observed Docker reality after a (simulated) manager restart.
 
-type Row = { id: string; name: string; state: ServerState; containerId: string | null };
+type Row = { id: string; name: string; game?: Game; state: ServerState; containerId: string | null };
 
 function makeService(rows: Row[], containers: Array<{ id: string; serverId: string; running: boolean; status: string }>, logs: Record<string, string> = {}) {
   const updates: Array<{ id: string; data: Record<string, unknown> }> = [];
@@ -67,7 +67,7 @@ describe("reconcile()", () => {
 
   it("adopts a running container that finished booting (Starting→Running via logs)", async () => {
     const { svc, forced, attached } = makeService(
-      [{ id: "s1", name: "A", state: ServerState.Starting, containerId: "old" }],
+      [{ id: "s1", name: "A", game: Game.ASA, state: ServerState.Starting, containerId: "old" }],
       [{ id: "c1", serverId: "s1", running: true, status: "Up 2h" }],
       { c1: "Server has completed startup and is now advertising for join. (10.2GB Mem)" },
     );
@@ -78,7 +78,7 @@ describe("reconcile()", () => {
 
   it("keeps Starting when a running container is still booting (no ready marker)", async () => {
     const { svc, forced, attached } = makeService(
-      [{ id: "s1", name: "A", state: ServerState.Starting, containerId: "c1" }],
+      [{ id: "s1", name: "A", game: Game.ASA, state: ServerState.Starting, containerId: "c1" }],
       [{ id: "c1", serverId: "s1", running: true, status: "Up 1m" }],
       { c1: "Proton: Upgrading prefix ..." },
     );

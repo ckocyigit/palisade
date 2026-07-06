@@ -79,15 +79,31 @@ type ServerRow = Awaited<ReturnType<PrismaService["server"]["findUnique"]>> & {
 // when the server starts listening — its joinable marker (verified against a real boot).
 //
 // Minecraft (itzg): the server logs `Done (12.345s)! For help, type "help"` exactly
-// once when the world has finished loading and it accepts joins (and RCON). The
-// `Done (...s)!` shape is Minecraft-specific, so it won't misfire on the others.
+// once when the world has finished loading and it accepts joins (and RCON).
 //
-// Icarus: has no RCON to lean on, so readiness is log-based. This clause requires
-// the literal "Icarus" near a ready/listening word so it can't false-fire on the
-// other games (whose logs never mention Icarus). PROVISIONAL — confirm the exact
-// line against a real boot and tighten it (the server is stuck "Starting" if wrong).
-export const READY_RE =
-  /(advertising for join(?!')|server is up|Startup report\. StartupTime=|Running Palworld dedicated server|Done \([\d.]+s\)! For help|Icarus.{0,60}\b(?:ready|listening|up and running)\b)/i;
+// Icarus (mornedhels, no RCON): the Unreal server binds its game port and the
+// GameMode reaches the lobby ("WaitingToStart") — verified against a real boot.
+//
+// Readiness is now GAME-SPECIFIC and each regex is tested only against its own
+// server's container logs (see attachMonitors), so a marker for one game can never
+// flip another. This matters because these are different engines that share generic
+// lines — e.g. "Engine is initialized" is Conan's too-EARLY line yet coincides with
+// Icarus being up, and both ARK images are Unreal like Icarus.
+export const READY_RE_BY_GAME: Record<Game, RegExp> = {
+  // POK logs "advertising for join" (ASA); hermsi logs "server is up" (ASE). Both
+  // ARK images keep both alternatives (unchanged from the old shared marker).
+  [Game.ASA]: /(advertising for join(?!')|server is up)/i,
+  [Game.ASE]: /(advertising for join(?!')|server is up)/i,
+  [Game.CONAN]: /Startup report\. StartupTime=/i,
+  [Game.PALWORLD]: /Running Palworld dedicated server/i,
+  [Game.MINECRAFT]: /Done \([\d.]+s\)! For help/i,
+  [Game.ICARUS]: /Match State Changed from EnteringMap to WaitingToStart|SteamNetDriver_\w+ bound to port/i,
+};
+
+/** The "server is now joinable" log-marker regex for a game. */
+export function readyReFor(game: Game): RegExp {
+  return READY_RE_BY_GAME[game];
+}
 const CRASH_WINDOW_MS = 5 * 60_000;
 const CRASH_LIMIT = 3;
 
@@ -173,7 +189,7 @@ export class ServersService implements OnApplicationBootstrap {
           resumed++;
           continue;
         }
-        await this.adoptRunning(server.id, c.id, dbState);
+        await this.adoptRunning(server.id, c.id, dbState, server.game as Game);
         adopted++;
       } else {
         // Exited or gone: drop the stale container + link, then settle the DB.
@@ -213,6 +229,7 @@ export class ServersService implements OnApplicationBootstrap {
     serverId: string,
     containerId: string,
     dbState: ServerState,
+    game: Game,
   ): Promise<void> {
     await this.prisma.server
       .update({ where: { id: serverId }, data: { containerId } })
@@ -221,7 +238,7 @@ export class ServersService implements OnApplicationBootstrap {
     let target = ServerState.Running;
     if (dbState === ServerState.Starting) {
       const log = await this.docker.tailLogs(containerId, 5000).catch(() => "");
-      target = READY_RE.test(log) ? ServerState.Running : ServerState.Starting;
+      target = readyReFor(game).test(log) ? ServerState.Running : ServerState.Starting;
     }
     if (target !== dbState) {
       await this.sm.force(serverId, target, "adopted running container on restart");
@@ -863,6 +880,11 @@ export class ServersService implements OnApplicationBootstrap {
     const seed = await this.docker.tailLogs(containerId, LOG_CAPTURE_MAX).catch(() => "");
     this.logCapture.seed(id, seed ? seed.split("\n").filter((l) => l.length > 0) : []);
 
+    // Resolve the readiness marker once (per-game) — it's tested against this
+    // server's own log lines only.
+    const row = await this.prisma.server.findUnique({ where: { id }, select: { game: true } });
+    const readyRe = readyReFor(row?.game as Game);
+
     const stop = await this.docker.followLogs(
       containerId,
       (line) => {
@@ -873,7 +895,7 @@ export class ServersService implements OnApplicationBootstrap {
           payload: { line },
           at: new Date().toISOString(),
         });
-        if (READY_RE.test(line)) void this.onReady(id);
+        if (readyRe.test(line)) void this.onReady(id);
       },
       0, // only new lines — the seed holds the backlog
     );
