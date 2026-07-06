@@ -671,6 +671,18 @@ export class ServersService implements OnApplicationBootstrap {
       }
       await this.writeInis(server);
 
+      // Bedrock's itzg image drops to UID/GID (env.PUID/PGID) and writes throughout
+      // /data (starting with /data/.tmp) — but a freshly bind-mounted instance dir is
+      // root-owned, so it can't, and the server exits. (The Java image chowns /data
+      // itself; the Bedrock one doesn't.) Own the instance root as the runtime user
+      // before launch so the first boot can write.
+      if (game === Game.BEDROCK) {
+        const env = loadEnv();
+        const root = LocalPaths.instanceRoot(id);
+        await mkdir(root, { recursive: true });
+        await chown(root, Number(env.PUID), Number(env.PGID)).catch(() => undefined);
+      }
+
       // Both images install their own mods on first boot (POK via MOD_IDS,
       // hermsi via `arkmanager installmod`), so nothing to pre-download here.
       const modIds = JSON.parse(server.modIds) as number[];
