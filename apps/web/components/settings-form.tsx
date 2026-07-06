@@ -427,6 +427,17 @@ export function SettingsForm({
 
   return (
     <div className="space-y-5">
+      {game === Game.ICARUS && (
+        <div className="flex items-start gap-2 rounded-md border border-ark-border bg-ark-bg px-3 py-2 text-xs text-slate-400">
+          <MapIcon className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" />
+          <span>
+            Map + game mode aren&apos;t set here — Icarus bundles them into a{" "}
+            <span className="text-slate-300">prospect</span> that players create from the in-game lobby (pick
+            Olympus / Styx / Prometheus and Mission vs Open World there). These settings control the lobby +
+            session behavior; the prospect then resumes across restarts.
+          </span>
+        </div>
+      )}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="relative min-w-[15rem] max-w-md flex-1">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />

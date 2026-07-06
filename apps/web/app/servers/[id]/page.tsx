@@ -269,6 +269,13 @@ function Overview({ server, onChanged }: { server: ServerSummary; onChanged: () 
             </div>
           ))}
         </dl>
+        {isIcarus && (
+          <p className="mt-3 text-xs leading-snug text-slate-500">
+            The map + game mode are set in-game: players pick Olympus / Styx / Prometheus and Mission vs Open
+            World when they create a <span className="text-slate-300">prospect</span> from the lobby. It resumes
+            across restarts.
+          </p>
+        )}
         <ConnectCommand
           game={server.game}
           gamePort={server.ports.game}

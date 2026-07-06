@@ -313,17 +313,25 @@ function CreateServerForm({ onDone }: { onDone: () => void }) {
         </div>
         <div>
           <label className="label">Map</label>
-          <select
-            className="input"
-            value={form.map}
-            onChange={(e) => setForm((f) => ({ ...f, map: e.target.value }))}
-          >
-            {maps.map((m) => (
-              <option key={m} value={m}>
-                {mapLabel(m)}
-              </option>
-            ))}
-          </select>
+          {game === Game.ICARUS ? (
+            // Icarus has no launch map — the world is a "prospect" (map + game mode +
+            // difficulty) players create in the in-game lobby. Show why, not an empty picker.
+            <p className="input flex items-center text-sm text-slate-400">
+              Chosen in-game (players pick the map + mode)
+            </p>
+          ) : (
+            <select
+              className="input"
+              value={form.map}
+              onChange={(e) => setForm((f) => ({ ...f, map: e.target.value }))}
+            >
+              {maps.map((m) => (
+                <option key={m} value={m}>
+                  {mapLabel(m)}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
         <div>
           <label className="label">Max players</label>
