@@ -55,7 +55,7 @@ export class AuthService {
   }
 
   private sign(sub: string, username: string): Promise<string> {
-    return this.jwt.signAsync({ sub, username, role: "admin" }, { expiresIn: "7d" });
+    return this.jwt.signAsync({ sub, username, role: "admin" }, { expiresIn: "30d" });
   }
 
   // ── User management (foundation for multi-user / RBAC) ─────────────────────
