@@ -12,13 +12,29 @@ beforeAll(() => {
 });
 
 describe("LocalPaths.savedDir", () => {
-  it("resolves ARK saves to ShooterGame/Saved under the instance dir", () => {
+  it("resolves ASA (POK, root install) saves to ShooterGame/Saved", () => {
     expect(LocalPaths.savedDir("s1", Game.ASA)).toMatch(/\/instances\/s1\/ShooterGame\/Saved$/);
-    expect(LocalPaths.savedDir("s1", Game.ASE)).toMatch(/\/instances\/s1\/ShooterGame\/Saved$/);
+  });
+  it("resolves ASE (hermsi, server/ install) saves to server/ShooterGame/Saved", () => {
+    // hermsi installs under <vol>/server, so ASE's Saved is NOT at the instance root.
+    expect(LocalPaths.savedDir("s1", Game.ASE)).toMatch(/\/instances\/s1\/server\/ShooterGame\/Saved$/);
   });
   it("resolves Conan saves to server/ConanSandbox/Saved", () => {
     expect(LocalPaths.savedDir("s1", Game.CONAN)).toMatch(
       /\/instances\/s1\/server\/ConanSandbox\/Saved$/,
     );
+  });
+});
+
+describe("LocalPaths.saveSubpaths", () => {
+  it("captures Minecraft's overworld + Paper/Spigot dimension siblings", () => {
+    expect(LocalPaths.saveSubpaths(Game.MINECRAFT)).toEqual(["world", "world_nether", "world_the_end"]);
+  });
+  it("captures Bedrock's worlds AND the add-on pack folders", () => {
+    expect(LocalPaths.saveSubpaths(Game.BEDROCK)).toEqual(["worlds", "behavior_packs", "resource_packs"]);
+  });
+  it("uses ASE's server/ prefix (not the ASA root path)", () => {
+    expect(LocalPaths.saveSubpaths(Game.ASE)).toEqual(["server/ShooterGame/Saved"]);
+    expect(LocalPaths.saveSubpaths(Game.ASA)).toEqual(["ShooterGame/Saved"]);
   });
 });

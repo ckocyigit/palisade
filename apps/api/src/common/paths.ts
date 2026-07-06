@@ -31,25 +31,44 @@ export const LocalPaths = {
     return `${loadEnv().DATA_DIR}/instances/${serverId}`;
   },
   /**
-   * The world save dir inside an instance — the world, configs, players/tribes.
-   * Game-specific: ARK (POK/ASA + hermsi/ASE) stores saves under `ShooterGame/Saved`;
-   * Conan stores them under `server/ConanSandbox/Saved` (the SQLite world DB + Config).
-   * Backup, restore, and import all operate on this; the wrong path finds nothing.
+   * The save/config subpaths inside an instance that a backup must capture (relative
+   * to the instance root). Most games have one; some need several. A subpath that
+   * doesn't exist for a given server (e.g. Minecraft's Nether on a vanilla world,
+   * where dimensions nest inside `world/`) is simply skipped when snapshotting.
+   *
+   * ARK: POK/ASA installs at the root → `ShooterGame/Saved`; hermsi/ASE installs
+   *   under `server/` → `server/ShooterGame/Saved`. Conan: the SQLite world DB +
+   *   Config under `server/ConanSandbox/Saved`. Palworld: `Pal/Saved`. Icarus: the
+   *   whole Wine-drive `config` dir (prospects + settings). Minecraft: the world,
+   *   plus Paper/Spigot's separate Nether/End sibling folders when present. Bedrock:
+   *   all worlds AND the add-on pack folders (they live beside `worlds/`, so a
+   *   restore without them would reference missing packs).
+   */
+  saveSubpaths(game: Game): string[] {
+    switch (game) {
+      case Game.ASE:
+        return ["server/ShooterGame/Saved"];
+      case Game.CONAN:
+        return ["server/ConanSandbox/Saved"];
+      case Game.PALWORLD:
+        return ["Pal/Saved"];
+      case Game.MINECRAFT:
+        return ["world", "world_nether", "world_the_end"];
+      case Game.ICARUS:
+        return ["config"];
+      case Game.BEDROCK:
+        return ["worlds", "behavior_packs", "resource_packs"];
+      default:
+        return ["ShooterGame/Saved"]; // ASA (POK)
+    }
+  },
+
+  /**
+   * The primary save dir inside an instance (the first of saveSubpaths) — used by
+   * import and anywhere a single dir is needed. Backup/restore iterate saveSubpaths.
    */
   savedDir(serverId: string, game: Game): string {
-    const sub =
-      game === Game.CONAN
-        ? "server/ConanSandbox/Saved"
-        : game === Game.PALWORLD
-          ? "Pal/Saved"
-          : game === Game.MINECRAFT
-            ? "world" // itzg writes the overworld to /data/world (+ world_nether, world_the_end)
-            : game === Game.ICARUS
-              ? "config" // Icarus config + prospects live under the Wine-drive bind (not the 15 GB game files)
-              : game === Game.BEDROCK
-                ? "worlds" // itzg bedrock stores worlds under /data/worlds
-                : "ShooterGame/Saved";
-    return `${this.instanceRoot(serverId)}/${sub}`;
+    return `${this.instanceRoot(serverId)}/${this.saveSubpaths(game)[0]}`;
   },
   /** Warmed golden copy of a game's files, reflink-cloned into each instance. */
   gameCache(game: Game): string {

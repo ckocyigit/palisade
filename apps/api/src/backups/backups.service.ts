@@ -1,14 +1,15 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common";
-import { cp, mkdir, readdir, rm } from "node:fs/promises";
+import { cp, mkdir, readdir, rm, stat } from "node:fs/promises";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { join, relative, sep } from "node:path";
+import { join, dirname, relative, sep } from "node:path";
 import { ServerState, EventType, Game } from "@ark/shared";
 import { PrismaService } from "../prisma/prisma.service";
 import { EventsService } from "../events/events.service";
 import { RconService } from "../rcon/rcon.service";
 import { ManagerSettingsService } from "../manager-settings/manager-settings.service";
 import { LocalPaths } from "../common/paths";
+import { SERVER_UID, SERVER_GID } from "../common/images";
 import { loadEnv } from "../config/env";
 
 const execFileP = promisify(execFile);
@@ -60,7 +61,9 @@ export class BackupsService {
     });
   }
 
-  /** Save the world (best-effort) then copy the Saved dir into backups/. */
+  /** Save the world (best-effort) then snapshot each of the game's save subpaths.
+   *  The snapshot mirrors the instance's relevant subpaths (e.g. Bedrock captures
+   *  worlds/ + behavior_packs/ + resource_packs/), so restore can put each back. */
   async create(serverId: string, reason: string) {
     const env = loadEnv();
     const server = await this.prisma.server.findUnique({ where: { id: serverId } });
@@ -68,18 +71,21 @@ export class BackupsService {
     const game = server.game as Game;
     await this.rcon.saveWorld(serverId).catch(() => undefined); // no-op on Conan
     const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-    const src = LocalPaths.savedDir(serverId, game);
+    const root = LocalPaths.instanceRoot(serverId);
     const destDir = join(env.DATA_DIR, "backups", serverId);
     const dest = join(destDir, `${reason}-${stamp}`);
-    await mkdir(destDir, { recursive: true });
+    await mkdir(dest, { recursive: true });
     try {
-      if (game === Game.CONAN) {
-        await this.backupConanSaved(src, dest);
-      } else {
-        await cp(src, dest, {
-          recursive: true,
-          filter: (s) => includeInBackup(relative(src, s)),
-        });
+      for (const sub of LocalPaths.saveSubpaths(game)) {
+        const src = join(root, sub);
+        if (!(await this.exists(src))) continue; // e.g. no Nether folder on a vanilla world
+        const to = join(dest, sub);
+        await mkdir(dirname(to), { recursive: true });
+        if (game === Game.CONAN) {
+          await this.backupConanSaved(src, to);
+        } else {
+          await cp(src, to, { recursive: true, filter: (s) => includeInBackup(relative(src, s)) });
+        }
       }
     } catch (err) {
       throw new BadRequestException(`Backup failed: ${(err as Error).message}`);
@@ -106,13 +112,23 @@ export class BackupsService {
     const snap = await this.prisma.snapshot.findUnique({ where: { id: snapshotId } });
     if (!snap) throw new NotFoundException("Backup not found");
 
-    const dest = LocalPaths.savedDir(serverId, server.game as Game);
+    const game = server.game as Game;
+    const root = LocalPaths.instanceRoot(serverId);
+    const [uid, gid] = this.runtimeOwner(game);
     // Snapshot the current state first so a restore is itself reversible.
     await this.create(serverId, "pre-restore").catch(() => undefined);
-    // Replace the live save dir wholesale — removing Conan's live .db-wal/.db-shm
-    // too, so the restored DB isn't shadowed by a stale WAL.
-    await rm(dest, { recursive: true, force: true });
-    await cp(snap.path, dest, { recursive: true });
+    // Replace each captured save subpath wholesale (removing Conan's live .db-wal/
+    // .db-shm too, so the restored DB isn't shadowed by a stale WAL), then chown to
+    // the runtime user so the server can read/write the restored files on next start.
+    for (const sub of LocalPaths.saveSubpaths(game)) {
+      const from = join(snap.path, sub);
+      if (!(await this.exists(from))) continue; // this subpath wasn't in the snapshot
+      const dest = join(root, sub);
+      await rm(dest, { recursive: true, force: true });
+      await mkdir(dirname(dest), { recursive: true });
+      await cp(from, dest, { recursive: true });
+      await execFileP("chown", ["-R", `${uid}:${gid}`, dest]).catch(() => undefined);
+    }
     await this.events.emit({
       type: EventType.BackupCreated,
       message: `Restored backup from ${snap.createdAt.toISOString()}`,
@@ -183,5 +199,22 @@ export class BackupsService {
       await rm(old.path, { recursive: true, force: true }).catch(() => undefined);
       await this.prisma.snapshot.delete({ where: { id: old.id } }).catch(() => undefined);
     }
+  }
+
+  private async exists(p: string): Promise<boolean> {
+    return stat(p)
+      .then(() => true)
+      .catch(() => false);
+  }
+
+  /** The uid/gid the game's server process runs as (so restored files stay readable
+   *  + writable). The itzg images (Minecraft/Bedrock) and Icarus run as the manager's
+   *  PUID/PGID; the others run as their image's fixed user (SERVER_UID/SERVER_GID). */
+  private runtimeOwner(game: Game): [number, number] {
+    if (game === Game.MINECRAFT || game === Game.BEDROCK || game === Game.ICARUS) {
+      const env = loadEnv();
+      return [Number(env.PUID), Number(env.PGID)];
+    }
+    return [SERVER_UID[game], SERVER_GID[game]];
   }
 }
