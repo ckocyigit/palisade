@@ -63,7 +63,9 @@ export const LocalPaths = {
       case Game.SEVEN_DAYS:
         return ["saves"]; // the .local/share/7DaysToDie bind (world + player data)
       case Game.ENSHROUDED:
-        return ["gamefiles/savegame"]; // the world save inside the game install bind
+        // The mornedhels image installs the game under /opt/enshrouded/server, so the
+        // savegame lands at server/savegame inside the gamefiles bind (verified live).
+        return ["gamefiles/server/savegame"];
       default:
         return ["ShooterGame/Saved"]; // ASA (POK)
     }

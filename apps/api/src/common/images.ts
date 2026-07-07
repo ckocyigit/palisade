@@ -75,9 +75,10 @@ export const VALHEIM_GAME_DIR = "/opt/valheim";
 export const SEVEN_DAYS_SERVERFILES_DIR = "/home/sdtdserver/serverfiles";
 export const SEVEN_DAYS_SAVES_DIR = "/home/sdtdserver/.local/share/7DaysToDie";
 
-/** Enshrouded (mornedhels): the game install + enshrouded_server.json + the savegame
- *  dir all live under /opt/enshrouded (savegame at /opt/enshrouded/savegame). We bind
- *  the whole dir; backups target just the savegame subpath. */
+/** Enshrouded (mornedhels): the image installs the game under /opt/enshrouded/server,
+ *  so the config (enshrouded_server.json) + the savegame dir live at
+ *  /opt/enshrouded/server/{enshrouded_server.json,savegame}. We bind the whole
+ *  /opt/enshrouded dir; backups target just the server/savegame subpath. */
 export const ENSHROUDED_GAME_DIR = "/opt/enshrouded";
 
 /**

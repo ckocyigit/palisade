@@ -889,7 +889,8 @@ function buildEnshroudedSpec(input: RuntimeSpecInput): Docker.ContainerCreateOpt
   ];
 
   // One bind covers the game install + enshrouded_server.json + the savegame dir
-  // (savegame at /opt/enshrouded/savegame; savedDir(ENSHROUDED) -> gamefiles/savegame).
+  // (the image installs under /opt/enshrouded/server, so the save lands at
+  // server/savegame inside the gamefiles bind — see LocalPaths.saveSubpaths).
   const binds = [`${HostPaths.instanceRoot(input.serverId)}/gamefiles:${ENSHROUDED_GAME_DIR}`];
 
   const hostNet = env.GAME_HOST_NETWORK;

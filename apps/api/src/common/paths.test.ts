@@ -37,4 +37,7 @@ describe("LocalPaths.saveSubpaths", () => {
     expect(LocalPaths.saveSubpaths(Game.ASE)).toEqual(["server/ShooterGame/Saved"]);
     expect(LocalPaths.saveSubpaths(Game.ASA)).toEqual(["ShooterGame/Saved"]);
   });
+  it("uses Enshrouded's server/savegame path (image installs under /opt/enshrouded/server)", () => {
+    expect(LocalPaths.saveSubpaths(Game.ENSHROUDED)).toEqual(["gamefiles/server/savegame"]);
+  });
 });
