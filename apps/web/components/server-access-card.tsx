@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { KeyRound, Save, Check } from "lucide-react";
-import { ServerState, type ServerSummary } from "@ark/shared";
+import { ServerState, ADMIN_PASSWORD_META, JOIN_PASSWORD_META, type ServerSummary } from "@ark/shared";
 import { apiPatch } from "@/lib/api";
 
 /** Set / change / remove a server's join + admin passwords. Works for every game
@@ -18,6 +18,8 @@ export function ServerAccessCard({
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
 
+  const adminMeta = ADMIN_PASSWORD_META[server.game];
+  const joinMeta = JOIN_PASSWORD_META[server.game];
   const joinChanged = serverPw !== (server.joinPassword ?? "");
   const adminChanged = adminPw.length > 0;
   const dirty = joinChanged || adminChanged;
@@ -50,37 +52,45 @@ export function ServerAccessCard({
         </h3>
       </div>
 
-      <div>
-        <label className="label">Server password (players need it to join)</label>
-        <input
-          className="input font-mono"
-          placeholder="Open server — anyone can join"
-          value={serverPw}
-          onChange={(e) => {
-            setServerPw(e.target.value);
-            setSaved(false);
-          }}
-        />
-        <p className="mt-1 text-xs text-slate-500">
-          {server.joinPassword
-            ? "Players enter this at the in-game “Password Required” prompt. Clear the box to remove it."
-            : "Leave blank for an open server."}
-        </p>
-      </div>
+      {joinMeta.show && (
+        <div>
+          <label className="label">{joinMeta.label}</label>
+          <input
+            className="input font-mono"
+            placeholder={joinMeta.required ? "" : "Open server — anyone can join"}
+            value={serverPw}
+            onChange={(e) => {
+              setServerPw(e.target.value);
+              setSaved(false);
+            }}
+          />
+          <p className="mt-1 text-xs text-slate-500">
+            {joinMeta.help
+              ? joinMeta.help
+              : server.joinPassword
+                ? "Players enter this at the in-game “Password Required” prompt. Clear the box to remove it."
+                : "Leave blank for an open server."}
+          </p>
+        </div>
+      )}
 
-      <div>
-        <label className="label">Admin password (enables RCON)</label>
-        <input
-          className="input font-mono"
-          placeholder={server.hasAdminPassword ? "•••••••• set — leave blank to keep" : "Not set"}
-          value={adminPw}
-          onChange={(e) => {
-            setAdminPw(e.target.value);
-            setSaved(false);
-          }}
-        />
-        <p className="mt-1 text-xs text-slate-500">For RCON + in-game admin. Never shown after saving.</p>
-      </div>
+      {adminMeta.show && (
+        <div>
+          <label className="label">{adminMeta.label}</label>
+          <input
+            className="input font-mono"
+            placeholder={server.hasAdminPassword ? "•••••••• set — leave blank to keep" : "Not set"}
+            value={adminPw}
+            onChange={(e) => {
+              setAdminPw(e.target.value);
+              setSaved(false);
+            }}
+          />
+          <p className="mt-1 text-xs text-slate-500">
+            {adminMeta.help ?? "For RCON + in-game admin."} Never shown after saving.
+          </p>
+        </div>
+      )}
 
       <div className="flex items-center gap-3">
         <button className="btn-primary" onClick={save} disabled={busy || !dirty}>

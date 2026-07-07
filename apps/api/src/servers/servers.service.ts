@@ -600,6 +600,17 @@ export class ServersService implements OnApplicationBootstrap {
       await this.prisma.portAllocation.deleteMany({ where: { serverId: id } });
       await this.prisma.server.delete({ where: { id } });
     });
+    // Delete server entirely: wipe the on-disk instance (game files + saves) AND the
+    // backups so nothing is orphaned on the array. Best-effort — the DB row is already
+    // gone, so a filesystem hiccup can't strand a half-deleted server. The UI warns
+    // this is permanent before calling here.
+    const env = loadEnv();
+    await rm(LocalPaths.instanceRoot(id), { recursive: true, force: true }).catch((e) =>
+      this.logger.warn(`Delete: instance dir cleanup failed for ${id}: ${(e as Error).message}`),
+    );
+    await rm(join(env.DATA_DIR, "backups", id), { recursive: true, force: true }).catch((e) =>
+      this.logger.warn(`Delete: backups cleanup failed for ${id}: ${(e as Error).message}`),
+    );
     await this.events.emit({
       type: EventType.ServerDeleted,
       message: `Deleted server "${server.name}"`,

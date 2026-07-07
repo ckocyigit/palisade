@@ -137,6 +137,101 @@ export const RAM_ESTIMATE_MB: Record<Game, number> = {
   [Game.ENSHROUDED]: 8000,
 };
 
+/**
+ * The largest player count each game actually supports, so the create form can cap
+ * the field instead of accepting a nonsensical value (e.g. 70 for Icarus, which tops
+ * out at 20). Some are hard engine limits (Valheim 10, Enshrouded 16, Icarus 20 after
+ * RocketWerkz raised it from 8); the rest are sane practical ceilings.
+ */
+export const MAX_PLAYERS_BY_GAME: Record<Game, number> = {
+  [Game.ASA]: 127,
+  [Game.ASE]: 127,
+  [Game.CONAN]: 40, // Conan Exiles server hard cap
+  [Game.PALWORLD]: 32, // Palworld dedicated hard cap
+  [Game.MINECRAFT]: 100, // no hard cap; a sane ceiling
+  [Game.ICARUS]: 20, // was 8, RocketWerkz raised the ceiling to 20 slots
+  [Game.BEDROCK]: 30,
+  [Game.VALHEIM]: 10, // Iron Gate design cap (P2P networking)
+  [Game.SEVEN_DAYS]: 64,
+  [Game.ENSHROUDED]: 16, // SERVER_SLOT_COUNT hard range 1–16
+};
+
+/** The default player count the create form pre-fills per game (a sensible starting
+ *  point, always <= MAX_PLAYERS_BY_GAME). */
+export const DEFAULT_MAX_PLAYERS_BY_GAME: Record<Game, number> = {
+  [Game.ASA]: 70,
+  [Game.ASE]: 70,
+  [Game.CONAN]: 40,
+  [Game.PALWORLD]: 16,
+  [Game.MINECRAFT]: 20,
+  [Game.ICARUS]: 8,
+  [Game.BEDROCK]: 10,
+  [Game.VALHEIM]: 10,
+  [Game.SEVEN_DAYS]: 8,
+  [Game.ENSHROUDED]: 16,
+};
+
+/** A password field on the create form: whether to show it at all, its label, an
+ *  optional help line, and whether it's required (with a minimum length). */
+export interface PasswordFieldMeta {
+  show: boolean;
+  label: string;
+  help?: string;
+  required?: boolean;
+  minLength?: number;
+}
+
+/**
+ * The admin/console password field, per game. Only games with a password-based admin
+ * path show it — ARK-family + Conan + Palworld + Minecraft gate RCON with it, Icarus
+ * uses it for the in-game /AdminLogin, and 7DTD uses it as the telnet console
+ * password. Bedrock has no such password; Valheim admins are a Steam-ID allowlist;
+ * Enshrouded derives its admin role from the join password — so those hide the field.
+ */
+export const ADMIN_PASSWORD_META: Record<Game, PasswordFieldMeta> = {
+  [Game.ASA]: { show: true, label: "Admin password (enables RCON)" },
+  [Game.ASE]: { show: true, label: "Admin password (enables RCON)" },
+  [Game.CONAN]: { show: true, label: "Admin password (enables RCON)" },
+  [Game.PALWORLD]: { show: true, label: "Admin password (enables RCON)" },
+  [Game.MINECRAFT]: { show: true, label: "RCON password (enables the console)" },
+  [Game.ICARUS]: { show: true, label: "Admin password (in-game /AdminLogin)" },
+  [Game.BEDROCK]: { show: false, label: "" },
+  [Game.VALHEIM]: { show: false, label: "" },
+  [Game.SEVEN_DAYS]: {
+    show: true,
+    label: "Telnet / admin password",
+    help: "Gates the in-app 7 Days to Die console (telnet).",
+  },
+  [Game.ENSHROUDED]: { show: false, label: "" },
+};
+
+/** The join (server) password field, per game. Every game can have one, but Valheim
+ *  and Enshrouded REQUIRE one of >= 5 chars, so their fields are marked required. */
+export const JOIN_PASSWORD_META: Record<Game, PasswordFieldMeta> = {
+  [Game.ASA]: { show: true, label: "Server password (players need it to join)" },
+  [Game.ASE]: { show: true, label: "Server password (players need it to join)" },
+  [Game.CONAN]: { show: true, label: "Server password (players need it to join)" },
+  [Game.PALWORLD]: { show: true, label: "Server password (players need it to join)" },
+  [Game.MINECRAFT]: { show: true, label: "Server password (players need it to join)" },
+  [Game.ICARUS]: { show: true, label: "Server password (players need it to join)" },
+  [Game.BEDROCK]: { show: true, label: "Server password (players need it to join)" },
+  [Game.VALHEIM]: {
+    show: true,
+    label: "Server password (required)",
+    help: "Valheim requires a join password of at least 5 characters.",
+    required: true,
+    minLength: 5,
+  },
+  [Game.SEVEN_DAYS]: { show: true, label: "Server password (players need it to join)" },
+  [Game.ENSHROUDED]: {
+    show: true,
+    label: "Server password (required)",
+    help: "Enshrouded requires a password of at least 5 characters. Players join as Guest with it; append -admin for admin.",
+    required: true,
+    minLength: 5,
+  },
+};
+
 /** Default port offsets within a per-server allocation block. */
 export interface PortSet {
   game: number; // UDP, players connect here

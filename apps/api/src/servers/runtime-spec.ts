@@ -9,6 +9,8 @@ import {
   type MotdValue,
 } from "@ark/shared";
 import { buildCustomArgs, isBattlEyeDisabled } from "../catalog/command-line";
+import { VALHEIM_MODIFIER_CATEGORY } from "../catalog/valheim.catalog";
+import { ENSHROUDED_MINUTE_NS_KEYS } from "../catalog/enshrouded.catalog";
 import { HostPaths, ContainerPaths } from "../common/paths";
 import {
   IMAGES,
@@ -738,12 +740,14 @@ function buildValheimSpec(input: RuntimeSpecInput): Docker.ContainerCreateOption
   const env = loadEnv();
   const { ports } = input;
 
+  const serverArgs = valheimServerArgs(input);
   const valheimEnv = [
     `TZ=${input.timezone || env.TZ}`,
     `SERVER_NAME=${input.sessionName}`,
     `SERVER_PASS=${serverPassword(input)}`, // >= 5 chars, enforced at create
     `SERVER_PORT=${ports.game}`, // query is game+1 (2457), crossplay is game+2 (2458)
     ...valheimCatalogEnv(input),
+    ...(serverArgs ? [`SERVER_ARGS=${serverArgs}`] : []),
   ];
 
   // Config + worlds under /config; the SteamCMD game install under /opt/valheim.
@@ -785,17 +789,42 @@ function buildValheimSpec(input: RuntimeSpecInput): Docker.ContainerCreateOption
   };
 }
 
-/** Valheim settings -> lloesche env vars. Booleans become true/false; empty dropped. */
+/** Valheim settings -> lloesche env vars. Booleans become true/false; empty dropped.
+ *  The "World modifiers" category is NOT env vars — it's compiled into SERVER_ARGS by
+ *  valheimServerArgs, so skip it here. */
 function valheimCatalogEnv(input: RuntimeSpecInput): string[] {
   const out: string[] = [];
   for (const def of input.catalog.settings) {
     if (def.target !== SettingTarget.Env) continue;
+    if (def.category === VALHEIM_MODIFIER_CATEGORY) continue;
     const raw = input.config.values?.[def.key] ?? def.default;
     if (raw === undefined || raw === null || raw === "") continue;
     const val = typeof raw === "boolean" ? (raw ? "true" : "false") : String(raw);
     out.push(`${def.emitAs ?? def.key}=${val}`);
   }
   return out;
+}
+
+/**
+ * Compile Valheim's "World modifiers" settings into the launch-flag string the
+ * lloesche image appends via SERVER_ARGS. PRESET -> `-preset <name>`; MOD_<name> ->
+ * `-modifier <name> <value>`; KEY_<name> (a true bool) -> `-setkey <name>`. Empty /
+ * "normal" values are skipped (use the game default). Returns "" when nothing is set.
+ */
+function valheimServerArgs(input: RuntimeSpecInput): string {
+  const args: string[] = [];
+  for (const def of input.catalog.settings) {
+    if (def.category !== VALHEIM_MODIFIER_CATEGORY) continue;
+    const raw = input.config.values?.[def.key] ?? def.default;
+    if (def.key === "PRESET") {
+      if (typeof raw === "string" && raw) args.push(`-preset ${raw}`);
+    } else if (def.key.startsWith("MOD_")) {
+      if (typeof raw === "string" && raw) args.push(`-modifier ${def.key.slice(4)} ${raw}`);
+    } else if (def.key.startsWith("KEY_")) {
+      if (raw === true) args.push(`-setkey ${def.key.slice(4)}`);
+    }
+  }
+  return args.join(" ");
 }
 
 /**
@@ -954,15 +983,22 @@ function enshroudedRoleEnv(input: RuntimeSpecInput): string[] {
   ];
 }
 
-/** Enshrouded settings -> mornedhels env vars. Booleans become true/false; empty dropped. */
+/** Enshrouded settings -> mornedhels env vars. Booleans become true/false; empty
+ *  dropped. The SERVER_GS_* duration knobs are edited in minutes but the game wants
+ *  nanoseconds, so those keys are multiplied by 60e9 on the way out. */
 function enshroudedCatalogEnv(input: RuntimeSpecInput): string[] {
   const out: string[] = [];
   for (const def of input.catalog.settings) {
     if (def.target !== SettingTarget.Env) continue;
     const raw = input.config.values?.[def.key] ?? def.default;
     if (raw === undefined || raw === null || raw === "") continue;
+    const emit = def.emitAs ?? def.key;
+    if (ENSHROUDED_MINUTE_NS_KEYS.has(emit)) {
+      out.push(`${emit}=${Math.round(Number(raw) * 60_000_000_000)}`); // minutes -> nanoseconds
+      continue;
+    }
     const val = typeof raw === "boolean" ? (raw ? "true" : "false") : String(raw);
-    out.push(`${def.emitAs ?? def.key}=${val}`);
+    out.push(`${emit}=${val}`);
   }
   return out;
 }

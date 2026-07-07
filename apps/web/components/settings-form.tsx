@@ -22,6 +22,8 @@ import {
   Sparkles,
   Clock,
   MessageSquare,
+  Skull,
+  Shield,
   Map as MapIcon,
   type LucideIcon,
 } from "lucide-react";
@@ -147,21 +149,30 @@ const BEDROCK_GROUPS: SettingGroup[] = [
   { id: "world", label: "World", Icon: MapIcon, cats: ["World"] },
 ];
 
-// Valheim's small env-driven catalog → its own tabs.
+// Valheim's env-driven catalog + launch-flag world modifiers → its own tabs.
 const VALHEIM_GROUPS: SettingGroup[] = [
   { id: "world", label: "World", Icon: MapIcon, cats: ["World"] },
   { id: "server", label: "Server", Icon: SlidersHorizontal, cats: ["Server"] },
+  { id: "modifiers", label: "World modifiers", Icon: Swords, cats: ["World modifiers"] },
 ];
 
-// 7 Days to Die (rendered into sdtdserver.xml) → its own tabs.
+// 7 Days to Die (rendered into sdtdserver.xml) → its own tabs, one per config section.
 const SEVEN_DAYS_GROUPS: SettingGroup[] = [
   { id: "world", label: "World", Icon: MapIcon, cats: ["World"] },
-  { id: "gameplay", label: "Gameplay", Icon: Swords, cats: ["Gameplay"] },
-  { id: "rates", label: "Rates", Icon: Gauge, cats: ["Rates"] },
+  { id: "difficulty", label: "Difficulty", Icon: Swords, cats: ["Difficulty"] },
+  { id: "zombies", label: "Zombies", Icon: Skull, cats: ["Zombies"] },
+  { id: "loot", label: "Loot", Icon: Package, cats: ["Loot"] },
+  { id: "landclaim", label: "Land claim", Icon: Shield, cats: ["Land claim"] },
+  { id: "players", label: "Players", Icon: User, cats: ["Players"] },
+  { id: "performance", label: "Performance", Icon: Wrench, cats: ["Performance"] },
 ];
 
-// Enshrouded's small env-driven catalog (difficulty is set in-game) → one tab.
+// Enshrouded's env-driven gameSettings (SERVER_GS_*) + chat → its own tabs.
 const ENSHROUDED_GROUPS: SettingGroup[] = [
+  { id: "difficulty", label: "Difficulty", Icon: Swords, cats: ["Difficulty"] },
+  { id: "players", label: "Players", Icon: User, cats: ["Players"] },
+  { id: "world", label: "World", Icon: MapIcon, cats: ["World"] },
+  { id: "economy", label: "Economy", Icon: Gauge, cats: ["Economy"] },
   { id: "chat", label: "Chat", Icon: MessageSquare, cats: ["Chat"] },
 ];
 

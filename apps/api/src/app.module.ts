@@ -14,6 +14,8 @@ import { ModsModule } from "./mods/mods.module";
 import { PalModsModule } from "./palmods/palmods.module";
 import { IcarusModsModule } from "./icarusmods/icarusmods.module";
 import { BedrockModsModule } from "./bedrockmods/bedrockmods.module";
+import { SevenDaysModsModule } from "./sevendaysmods/sevendaysmods.module";
+import { ValheimModsModule } from "./valheimmods/valheimmods.module";
 import { ClustersModule } from "./clusters/clusters.module";
 import { BackupsModule } from "./backups/backups.module";
 import { NotificationsModule } from "./notifications/notifications.module";
@@ -42,6 +44,8 @@ import { HealthController } from "./health/health.controller";
     PalModsModule,
     IcarusModsModule,
     BedrockModsModule,
+    SevenDaysModsModule,
+    ValheimModsModule,
     ClustersModule,
     BackupsModule,
     NotificationsModule,

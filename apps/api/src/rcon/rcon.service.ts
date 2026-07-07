@@ -7,6 +7,7 @@ import { EventsService } from "../events/events.service";
 import { RealtimeGateway } from "../realtime/realtime.gateway";
 import { LogCaptureService } from "../logs/log-capture.service";
 import { SourceRcon } from "./source-rcon";
+import { TelnetRcon } from "./telnet-rcon";
 import { containerName } from "../common/naming";
 import { loadEnv } from "../config/env";
 
@@ -71,9 +72,12 @@ export class RconService {
     const opts = { host, port: server.rconPort, password, timeout: 10_000 };
     // Conan AND Palworld reply with non-matching packet ids that time out
     // rcon-client's strict matching — route both through the lenient SourceRcon.
+    // 7 Days to Die has no Source RCON at all — its console is telnet on 8081, so it
+    // goes through the line-based TelnetRcon adapter instead.
     const game = server.game as Game;
     const lenient = game === Game.CONAN || game === Game.PALWORLD;
-    const rcon: RconConn = lenient ? new SourceRcon(opts) : new Rcon(opts);
+    const rcon: RconConn =
+      game === Game.SEVEN_DAYS ? new TelnetRcon(opts) : lenient ? new SourceRcon(opts) : new Rcon(opts);
     rcon.on("error", () => this.pool.delete(serverId));
     rcon.on("end", () => this.pool.delete(serverId));
     await rcon.connect();
@@ -119,21 +123,23 @@ export class RconService {
   }
 
   async broadcast(serverId: string, message: string): Promise<string> {
-    // ARK: ServerChat. Conan: broadcast. Palworld: Broadcast. Minecraft: say.
+    // ARK: ServerChat. Conan: broadcast. Palworld: Broadcast. Minecraft: say. 7DTD: say.
     const game = await this.gameOf(serverId);
     if (game === Game.CONAN) return this.exec(serverId, `broadcast ${message}`);
     if (game === Game.PALWORLD) return this.exec(serverId, `Broadcast ${message}`);
     if (game === Game.MINECRAFT) return this.exec(serverId, `say ${message}`);
+    if (game === Game.SEVEN_DAYS) return this.exec(serverId, `say "${message}"`);
     return this.exec(serverId, `ServerChat ${message}`);
   }
 
   async saveWorld(serverId: string): Promise<string> {
-    // ARK: SaveWorld. Palworld: Save. Minecraft: save-all. Conan has no manual-save
-    // RCON command — it persists continuously to a SQLite DB (and flushes on shutdown).
+    // ARK: SaveWorld. Palworld: Save. Minecraft: save-all. 7DTD: saveworld. Conan has
+    // no manual-save command — it persists continuously to SQLite (flushes on shutdown).
     const game = await this.gameOf(serverId);
     if (game === Game.CONAN) return "Conan saves continuously to its database — no manual save needed.";
     if (game === Game.PALWORLD) return this.exec(serverId, "Save");
     if (game === Game.MINECRAFT) return this.exec(serverId, "save-all");
+    if (game === Game.SEVEN_DAYS) return this.exec(serverId, "saveworld");
     return this.exec(serverId, "SaveWorld");
   }
 
@@ -142,14 +148,23 @@ export class RconService {
   }
 
   async listPlayers(serverId: string): Promise<string[]> {
+    const game = await this.gameOf(serverId);
     // Minecraft: `list` → "There are 2 of a max of 20 players online: Steve, Alex".
-    if ((await this.gameOf(serverId)) === Game.MINECRAFT) {
+    if (game === Game.MINECRAFT) {
       const out = await this.exec(serverId, "list");
       const names = out.split(/online:/i)[1] ?? "";
       return names
         .split(",")
         .map((n) => n.trim())
         .filter(Boolean);
+    }
+    // 7DTD `lp` → "1. id=EOS_..., PlayerName, pos=(...), ..." + a "Total of N" line.
+    if (game === Game.SEVEN_DAYS) {
+      const out = await this.exec(serverId, "listplayers");
+      return out
+        .split("\n")
+        .map((l) => l.match(/^\s*\d+\.\s*id=\S+?,\s*([^,]+?),/i)?.[1]?.trim())
+        .filter((n): n is string => Boolean(n));
     }
     const out = await this.exec(serverId, "ListPlayers");
     if (/no players/i.test(out)) return [];
@@ -159,11 +174,19 @@ export class RconService {
       .filter(Boolean);
   }
 
-  kick(serverId: string, playerId: string): Promise<string> {
+  async kick(serverId: string, playerId: string): Promise<string> {
+    // 7DTD: `kick <name/id>`. Minecraft: `kick`. ARK-family: `KickPlayer`.
+    const game = await this.gameOf(serverId);
+    if (game === Game.SEVEN_DAYS) return this.exec(serverId, `kick "${playerId}"`);
+    if (game === Game.MINECRAFT) return this.exec(serverId, `kick ${playerId}`);
     return this.exec(serverId, `KickPlayer ${playerId}`);
   }
 
-  ban(serverId: string, playerId: string): Promise<string> {
+  async ban(serverId: string, playerId: string): Promise<string> {
+    // 7DTD: `ban add <name/id> 365 days`. Minecraft: `ban`. ARK-family: `BanPlayer`.
+    const game = await this.gameOf(serverId);
+    if (game === Game.SEVEN_DAYS) return this.exec(serverId, `ban add "${playerId}" 365 days "banned"`);
+    if (game === Game.MINECRAFT) return this.exec(serverId, `ban ${playerId}`);
     return this.exec(serverId, `BanPlayer ${playerId}`);
   }
 

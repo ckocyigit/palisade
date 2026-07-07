@@ -1,9 +1,10 @@
 "use client";
 import { use, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Play, Square, RotateCw, Download, Loader2, Pencil, Check, X } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ArrowLeft, Play, Square, RotateCw, Download, Loader2, Pencil, Check, X, Trash2, AlertTriangle } from "lucide-react";
 import { mapLabel, Game, ServerState, type ServerSummary, type ServerConfigValues } from "@ark/shared";
-import { apiGet, apiPost, apiPatch } from "@/lib/api";
+import { apiGet, apiPost, apiPatch, apiDelete } from "@/lib/api";
 import { useRealtime } from "@/lib/socket";
 import { StateBadge } from "@/components/state-badge";
 import { UpdateBadge } from "@/components/update-badge";
@@ -21,6 +22,8 @@ import { PalworldModsTab } from "@/components/palworld-mods-tab";
 import { MinecraftModsTab } from "@/components/minecraft-mods-tab";
 import { IcarusModsTab } from "@/components/icarus-mods-tab";
 import { BedrockModsTab } from "@/components/bedrock-mods-tab";
+import { SevenDaysModsTab } from "@/components/sevendays-mods-tab";
+import { ValheimModsTab } from "@/components/valheim-mods-tab";
 import { useStartGuard } from "@/components/start-guard";
 import { BackupsTab } from "@/components/backups-tab";
 
@@ -29,6 +32,7 @@ type Tab = (typeof TABS)[number];
 
 export default function ServerDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  const router = useRouter();
   const [server, setServer] = useState<ServerSummary | null>(null);
   const [config, setConfig] = useState<ServerConfigValues | null>(null);
   const [configKey, setConfigKey] = useState(0); // bump to remount the editor on copy-in
@@ -37,6 +41,8 @@ export default function ServerDetailPage({ params }: { params: Promise<{ id: str
   const [renaming, setRenaming] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
   const [savingName, setSavingName] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   // Keep the active tab in the URL (?tab=settings) so a refresh lands you back
   // on the same tab instead of Overview. Uses replaceState — no scroll/navigation.
@@ -118,6 +124,18 @@ export default function ServerDetailPage({ params }: { params: Promise<{ id: str
     }
   };
 
+  const doDelete = async () => {
+    setDeleting(true);
+    try {
+      await apiDelete(`/servers/${id}`);
+      router.push("/"); // gone — back to the server list
+    } catch (e) {
+      alert((e as Error).message);
+      setDeleting(false);
+      setConfirmingDelete(false);
+    }
+  };
+
   if (!server) return <div className="text-slate-400">Loading…</div>;
 
   // Button availability follows the server state machine; `pending` covers the
@@ -138,11 +156,13 @@ export default function ServerDetailPage({ params }: { params: Promise<{ id: str
   const hiddenTabs =
     server.game === Game.ICARUS || server.game === Game.BEDROCK
       ? new Set<Tab>(["Console"])
-      : server.game === Game.VALHEIM ||
-          server.game === Game.SEVEN_DAYS ||
-          server.game === Game.ENSHROUDED
-        ? new Set<Tab>(["Console", "Mods"]) // 7DTD's console is telnet (not wired yet); Enshrouded has no RCON/mod browser
-        : new Set<Tab>();
+      : server.game === Game.SEVEN_DAYS
+        ? new Set<Tab>() // telnet console + mod uploader — both tabs shown
+        : server.game === Game.VALHEIM
+          ? new Set<Tab>(["Console"]) // no RCON, but a Thunderstore mod browser
+          : server.game === Game.ENSHROUDED
+            ? new Set<Tab>(["Console", "Mods"]) // no RCON, no mod support
+            : new Set<Tab>();
   const visibleTabs = TABS.filter((t) => !hiddenTabs.has(t));
 
   return (
@@ -207,8 +227,25 @@ export default function ServerDetailPage({ params }: { params: Promise<{ id: str
             {showStopping ? <Loader2 className="h-4 w-4 animate-spin" /> : <Square className="h-4 w-4" />}{" "}
             {showStopping ? "Stopping…" : "Stop"}
           </button>
+          <button
+            className="inline-flex items-center gap-1.5 rounded-md border border-rose-900/60 bg-rose-950/40 px-3 py-1.5 text-sm font-medium text-rose-300 transition-colors hover:bg-rose-900/50 disabled:opacity-50"
+            disabled={!!pending || deleting}
+            onClick={() => setConfirmingDelete(true)}
+            title="Delete this server permanently"
+          >
+            <Trash2 className="h-4 w-4" /> Delete
+          </button>
         </div>
       </div>
+
+      {confirmingDelete && (
+        <DeleteConfirm
+          server={server}
+          deleting={deleting}
+          onCancel={() => setConfirmingDelete(false)}
+          onConfirm={doDelete}
+        />
+      )}
 
       <div className="flex gap-1 border-b border-ark-border">
         {visibleTabs.map((t) => (
@@ -240,6 +277,10 @@ export default function ServerDetailPage({ params }: { params: Promise<{ id: str
           <IcarusModsTab serverId={id} />
         ) : server.game === Game.BEDROCK ? (
           <BedrockModsTab serverId={id} />
+        ) : server.game === Game.SEVEN_DAYS ? (
+          <SevenDaysModsTab serverId={id} />
+        ) : server.game === Game.VALHEIM ? (
+          <ValheimModsTab serverId={id} />
         ) : (
           <ModsTab serverId={id} game={server.game} />
         ))}
@@ -249,6 +290,77 @@ export default function ServerDetailPage({ params }: { params: Promise<{ id: str
       {tab === "Logs" && <LogsTab serverId={id} />}
       {tab === "Schedules" && <ScheduleList serverId={id} />}
       {tab === "Backups" && <BackupsTab serverId={id} />}
+    </div>
+  );
+}
+
+/**
+ * Destructive-delete confirmation. Wiping a server removes the container, the
+ * on-disk game files + world saves, AND its backups — irreversible — so we gate it
+ * behind typing the server's name (a deliberate friction, like GitHub's repo delete).
+ */
+function DeleteConfirm({
+  server,
+  deleting,
+  onCancel,
+  onConfirm,
+}: {
+  server: ServerSummary;
+  deleting: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const [typed, setTyped] = useState("");
+  const armed = typed.trim() === server.name.trim();
+  const isLive = server.state === ServerState.Running || server.state === ServerState.Starting;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={onCancel}>
+      <div
+        className="w-full max-w-md rounded-lg border border-rose-900/60 bg-ark-panel p-5 shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-3 flex items-center gap-2 text-rose-300">
+          <AlertTriangle className="h-5 w-5" />
+          <h2 className="text-lg font-semibold">Delete “{server.name}”?</h2>
+        </div>
+        <p className="text-sm leading-snug text-slate-300">
+          This permanently removes the server, its <span className="text-slate-100">game files</span> and{" "}
+          <span className="text-slate-100">world saves</span>, and{" "}
+          <span className="text-slate-100">all of its backups</span>. This cannot be undone.
+        </p>
+        {isLive && (
+          <p className="mt-2 text-sm font-medium text-rose-300">
+            The server is running — it will be force-stopped first.
+          </p>
+        )}
+        <label className="label mt-4">
+          Type <span className="font-mono text-slate-200">{server.name}</span> to confirm
+        </label>
+        <input
+          autoFocus
+          className="input"
+          value={typed}
+          onChange={(e) => setTyped(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && armed && !deleting) onConfirm();
+            if (e.key === "Escape") onCancel();
+          }}
+          placeholder={server.name}
+        />
+        <div className="mt-5 flex justify-end gap-2">
+          <button className="btn-secondary" onClick={onCancel} disabled={deleting}>
+            Cancel
+          </button>
+          <button
+            className="inline-flex items-center gap-1.5 rounded-md bg-rose-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-rose-500 disabled:opacity-40"
+            disabled={!armed || deleting}
+            onClick={onConfirm}
+          >
+            {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+            {deleting ? "Deleting…" : "Delete permanently"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

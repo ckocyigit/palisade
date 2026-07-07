@@ -399,6 +399,28 @@ describe("buildContainerSpec (Valheim / lloesche)", () => {
     expect(env).toContain("SERVER_PUBLIC=false");
     expect(env).toContain("CROSSPLAY=true");
   });
+
+  it("compiles world modifiers into SERVER_ARGS (not bogus env vars)", async () => {
+    const env = envOf(
+      await buildValheim({
+        values: { PRESET: "hard", MOD_combat: "veryhard", MOD_portals: "casual", KEY_nomap: true },
+      }),
+    );
+    const args = env.find((e) => e.startsWith("SERVER_ARGS="));
+    expect(args).toBeDefined();
+    expect(args).toContain("-preset hard");
+    expect(args).toContain("-modifier combat veryhard");
+    expect(args).toContain("-modifier portals casual");
+    expect(args).toContain("-setkey nomap");
+    // The modifier keys must NOT leak through as their own env vars.
+    expect(env.some((e) => e.startsWith("PRESET="))).toBe(false);
+    expect(env.some((e) => e.startsWith("MOD_combat="))).toBe(false);
+  });
+
+  it("omits SERVER_ARGS when no modifiers are set", async () => {
+    const env = envOf(await buildValheim({ values: {} }));
+    expect(env.some((e) => e.startsWith("SERVER_ARGS="))).toBe(false);
+  });
 });
 
 async function buildSdtd() {
@@ -513,6 +535,16 @@ describe("buildContainerSpec (Enshrouded / mornedhels)", () => {
     );
     expect(env).toContain("SERVER_ENABLE_TEXT_CHAT=true");
     expect(env).toContain("SERVER_VOICE_CHAT_MODE=Global");
+  });
+
+  it("converts SERVER_GS duration knobs from minutes to nanoseconds", async () => {
+    const env = envOf(
+      await buildEnshrouded({
+        values: { SERVER_GS_DAY_TIME_DURATION: 30, SERVER_GS_ENEMY_DAMAGE_FACTOR: 1.5 },
+      }),
+    );
+    expect(env).toContain("SERVER_GS_DAY_TIME_DURATION=1800000000000"); // 30 min * 60e9
+    expect(env).toContain("SERVER_GS_ENEMY_DAMAGE_FACTOR=1.5"); // factors pass through as-is
   });
 });
 

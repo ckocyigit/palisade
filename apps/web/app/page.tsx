@@ -19,6 +19,10 @@ import {
   SEVEN_DAYS_OFFICIAL_MAPS,
   ENSHROUDED_OFFICIAL_MAPS,
   GAME_LABELS,
+  MAX_PLAYERS_BY_GAME,
+  DEFAULT_MAX_PLAYERS_BY_GAME,
+  ADMIN_PASSWORD_META,
+  JOIN_PASSWORD_META,
   mapLabel,
   type ServerSummary,
   type ServerStatsById,
@@ -271,17 +275,30 @@ function CreateServerForm({ onDone }: { onDone: () => void }) {
   }>({
     name: "",
     map: maps[0],
-    maxPlayers: 70,
+    maxPlayers: DEFAULT_MAX_PLAYERS_BY_GAME[Game.ASA],
     adminPassword: "",
     serverPassword: "",
   });
   const [busy, setBusy] = useState(false);
 
+  const maxPlayersCap = MAX_PLAYERS_BY_GAME[game];
+  const adminMeta = ADMIN_PASSWORD_META[game];
+  const joinMeta = JOIN_PASSWORD_META[game];
+  // Block submit when a required join password is missing/too short (mirrors the API).
+  const joinTooShort =
+    joinMeta.required && (form.serverPassword ?? "").length < (joinMeta.minLength ?? 1);
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (joinTooShort) {
+      alert(joinMeta.help ?? "This game requires a server password.");
+      return;
+    }
+    // Clamp to the game's real ceiling so we never send e.g. 70 for a 20-slot game.
+    const clamped = Math.max(1, Math.min(Number(form.maxPlayers) || 1, maxPlayersCap));
     setBusy(true);
     try {
-      await apiPost("/servers", { ...form, game, maxPlayers: Number(form.maxPlayers) });
+      await apiPost("/servers", { ...form, game, maxPlayers: clamped });
       onDone();
     } catch (err) {
       alert((err as Error).message);
@@ -309,7 +326,12 @@ function CreateServerForm({ onDone }: { onDone: () => void }) {
             onChange={(e) => {
               const g = e.target.value as Game;
               setGame(g);
-              setForm((f) => ({ ...f, map: MAPS_FOR[g][0] })); // reset map to the new game's default
+              // Reset the map AND clamp the player count to the new game's default/cap.
+              setForm((f) => ({
+                ...f,
+                map: MAPS_FOR[g][0],
+                maxPlayers: DEFAULT_MAX_PLAYERS_BY_GAME[g],
+              }));
             }}
           >
             {Object.values(Game).map((g) => (
@@ -345,30 +367,41 @@ function CreateServerForm({ onDone }: { onDone: () => void }) {
           <label className="label">Max players</label>
           <input
             type="number"
+            min={1}
+            max={maxPlayersCap}
             className="input"
             value={form.maxPlayers}
             onChange={(e) => setForm((f) => ({ ...f, maxPlayers: Number(e.target.value) }))}
           />
+          <p className="mt-1 text-xs text-slate-500">Max {maxPlayersCap} for {GAME_LABELS[game]}.</p>
         </div>
-        <div>
-          <label className="label">Admin password (enables RCON)</label>
-          <input
-            className="input"
-            value={form.adminPassword}
-            onChange={(e) => setForm((f) => ({ ...f, adminPassword: e.target.value }))}
-          />
-        </div>
-        <div>
-          <label className="label">Server password (players need it to join)</label>
-          <input
-            className="input"
-            placeholder="Leave blank for an open server"
-            value={form.serverPassword}
-            onChange={(e) => setForm((f) => ({ ...f, serverPassword: e.target.value }))}
-          />
-        </div>
+        {adminMeta.show && (
+          <div>
+            <label className="label">{adminMeta.label}</label>
+            <input
+              className="input"
+              value={form.adminPassword}
+              onChange={(e) => setForm((f) => ({ ...f, adminPassword: e.target.value }))}
+            />
+            {adminMeta.help && <p className="mt-1 text-xs text-slate-500">{adminMeta.help}</p>}
+          </div>
+        )}
+        {joinMeta.show && (
+          <div>
+            <label className="label">{joinMeta.label}</label>
+            <input
+              className="input"
+              placeholder={joinMeta.required ? "" : "Leave blank for an open server"}
+              value={form.serverPassword}
+              onChange={(e) => setForm((f) => ({ ...f, serverPassword: e.target.value }))}
+            />
+            {joinMeta.help && (
+              <p className={`mt-1 text-xs ${joinTooShort ? "text-rose-400" : "text-slate-500"}`}>{joinMeta.help}</p>
+            )}
+          </div>
+        )}
       </div>
-      <button className="btn-primary" disabled={busy}>
+      <button className="btn-primary" disabled={busy || joinTooShort}>
         {busy ? "Creating…" : "Create server"}
       </button>
     </form>
