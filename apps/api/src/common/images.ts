@@ -30,6 +30,9 @@ export const IMAGES: Record<Game, string> = {
   // lloesche/valheim-server — installs the native Linux Valheim server via SteamCMD on
   // boot; env-driven (SERVER_NAME/WORLD_NAME/SERVER_PASS…). UDP (2456/2457). No RCON.
   [Game.VALHEIM]: "lloesche/valheim-server:latest",
+  // vinanrra/7dtd-server — LinuxGSM-wrapped 7 Days to Die server. Installs via SteamCMD
+  // on boot; the game settings live in sdtdserver.xml (we render it). Telnet console.
+  [Game.SEVEN_DAYS]: "vinanrra/7dtd-server:latest",
 };
 
 /** POK keeps all instance data (install + saves + config) under this path. */
@@ -63,6 +66,12 @@ export const BEDROCK_DATA_DIR = "/data";
 export const VALHEIM_CONFIG_DIR = "/config";
 export const VALHEIM_GAME_DIR = "/opt/valheim";
 
+/** 7 Days to Die (vinanrra/LinuxGSM): the game install + sdtdserver.xml live under
+ *  serverfiles/; the world/player saves live under the user's .local/share. Bound
+ *  separately so backups target the small saves dir, not the ~20 GB install. */
+export const SEVEN_DAYS_SERVERFILES_DIR = "/home/sdtdserver/serverfiles";
+export const SEVEN_DAYS_SAVES_DIR = "/home/sdtdserver/.local/share/7DaysToDie";
+
 /**
  * The uid/gid each image runs the server as. Neither chowns its mounts fully
  * (POK never does; hermsi only chowns the volume root), so the manager makes the
@@ -77,6 +86,7 @@ export const SERVER_UID: Record<Game, number> = {
   [Game.ICARUS]: 4711, // mornedhels default (overridable via PUID/PGID); unused — env-driven, no INI injection
   [Game.BEDROCK]: 1000, // itzg derives UID/GID from /data owner; we pass PUID/PGID. Unused here.
   [Game.VALHEIM]: 0, // lloesche runs as root by default (we don't override PUID/PGID)
+  [Game.SEVEN_DAYS]: 1000, // LinuxGSM's sdtdserver user; we pass env.PUID/PGID + chown
 };
 export const SERVER_GID: Record<Game, number> = {
   [Game.ASA]: 7777,
@@ -87,4 +97,5 @@ export const SERVER_GID: Record<Game, number> = {
   [Game.ICARUS]: 4711,
   [Game.BEDROCK]: 1000,
   [Game.VALHEIM]: 0,
+  [Game.SEVEN_DAYS]: 1000,
 };

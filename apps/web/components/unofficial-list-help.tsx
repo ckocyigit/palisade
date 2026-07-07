@@ -37,6 +37,7 @@ export function UnofficialListHelp({
   const icarus = game === Game.ICARUS;
   const bedrock = game === Game.BEDROCK;
   const valheim = game === Game.VALHEIM;
+  const sdtd = game === Game.SEVEN_DAYS;
   const passwordHint = hasJoinPassword
     ? "your server has a join password"
     : "ON only if you set a join password";
@@ -53,7 +54,7 @@ export function UnofficialListHelp({
           <Search className="h-3.5 w-3.5" />
           {minecraft || bedrock
             ? "Add it to your Minecraft server list"
-            : conan || palworld || icarus || valheim
+            : conan || palworld || icarus || valheim || sdtd
               ? "Find it in the in-game server browser"
               : "Find it on the in-game Unofficial list"}
         </span>
@@ -61,7 +62,23 @@ export function UnofficialListHelp({
       </button>
 
       {open &&
-        (valheim ? (
+        (sdtd ? (
+          <div className="space-y-1.5 border-t border-ark-border px-2.5 py-2 text-xs">
+            <p className="text-slate-400">
+              In <span className="text-slate-200">Join a Game</span>:
+            </p>
+            <FilterRow state="on" label="Server browser — search by name, or Connect to Server by IP" />
+            <FilterRow
+              state={hasJoinPassword ? "on" : "off"}
+              label="Password-protected servers still list"
+              hint={passwordHint}
+            />
+            <p className="pt-1 leading-snug text-slate-400">
+              Search the name <span className="font-mono text-slate-200">{serverName}</span>, or use{" "}
+              <span className="text-slate-200">Connect to Server</span> with the address shown above.
+            </p>
+          </div>
+        ) : valheim ? (
           <div className="space-y-1.5 border-t border-ark-border px-2.5 py-2 text-xs">
             <p className="text-slate-400">
               In <span className="text-slate-200">Join Game → Community</span>:

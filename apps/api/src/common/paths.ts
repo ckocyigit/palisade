@@ -60,6 +60,8 @@ export const LocalPaths = {
         return ["worlds", "behavior_packs", "resource_packs"];
       case Game.VALHEIM:
         return ["config/worlds_local"]; // lloesche stores the world .db/.fwl here
+      case Game.SEVEN_DAYS:
+        return ["saves"]; // the .local/share/7DaysToDie bind (world + player data)
       default:
         return ["ShooterGame/Saved"]; // ASA (POK)
     }

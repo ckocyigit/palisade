@@ -211,7 +211,12 @@ export class BackupsService {
    *  + writable). The itzg images (Minecraft/Bedrock) and Icarus run as the manager's
    *  PUID/PGID; the others run as their image's fixed user (SERVER_UID/SERVER_GID). */
   private runtimeOwner(game: Game): [number, number] {
-    if (game === Game.MINECRAFT || game === Game.BEDROCK || game === Game.ICARUS) {
+    if (
+      game === Game.MINECRAFT ||
+      game === Game.BEDROCK ||
+      game === Game.ICARUS ||
+      game === Game.SEVEN_DAYS
+    ) {
       const env = loadEnv();
       return [Number(env.PUID), Number(env.PGID)];
     }

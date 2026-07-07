@@ -22,6 +22,8 @@ import {
   BEDROCK_DATA_DIR,
   VALHEIM_CONFIG_DIR,
   VALHEIM_GAME_DIR,
+  SEVEN_DAYS_SERVERFILES_DIR,
+  SEVEN_DAYS_SAVES_DIR,
 } from "../common/images";
 import { ARK_NETWORK, containerName } from "../common/naming";
 import { loadEnv } from "../config/env";
@@ -57,6 +59,7 @@ export function buildContainerSpec(input: RuntimeSpecInput): Docker.ContainerCre
   if (input.game === Game.ICARUS) return buildIcarusSpec(input);
   if (input.game === Game.BEDROCK) return buildBedrockSpec(input);
   if (input.game === Game.VALHEIM) return buildValheimSpec(input);
+  if (input.game === Game.SEVEN_DAYS) return buildSevenDaysSpec(input);
   return buildAseSpec(input);
 }
 
@@ -791,4 +794,118 @@ function valheimCatalogEnv(input: RuntimeSpecInput): string[] {
     out.push(`${def.emitAs ?? def.key}=${val}`);
   }
   return out;
+}
+
+/**
+ * 7 Days to Die (vinanrra/LinuxGSM): env vars here drive the CONTAINER/LinuxGSM
+ * (install/update/start, no LinuxGSM backup/monitor loops since the manager owns the
+ * lifecycle). The game's own settings live in sdtdserver.xml, which the manager
+ * renders into the serverfiles bind (see ServersService.writeInis). The game port is
+ * 26900 (TCP + UDP) + 26901/26902 UDP; the telnet console ("RCON") is 8081/TCP. Runs
+ * as env.PUID/PGID, so the root-owned instance binds are chowned before start.
+ */
+function buildSevenDaysSpec(input: RuntimeSpecInput): Docker.ContainerCreateOptions {
+  const env = loadEnv();
+  const { ports } = input;
+
+  const sdtdEnv = [
+    `TZ=${input.timezone || env.TZ}`,
+    `PUID=${env.PUID}`,
+    `PGID=${env.PGID}`,
+    `START_MODE=1`, // install/update if needed, then start (LinuxGSM)
+    `VERSION=stable`,
+    `BACKUP=NO`, // manager owns backups
+    `MONITOR=NO`, // manager owns the crash watchdog
+  ];
+
+  const root = HostPaths.instanceRoot(input.serverId);
+  const binds = [
+    `${root}/serverfiles:${SEVEN_DAYS_SERVERFILES_DIR}`, // ~20 GB game install + sdtdserver.xml
+    `${root}/saves:${SEVEN_DAYS_SAVES_DIR}`, // world + player saves
+  ];
+
+  const exposed: Docker.ContainerCreateOptions["ExposedPorts"] = {
+    [portKey(ports.game, "tcp")]: {},
+    [portKey(ports.game, "udp")]: {},
+    [portKey(ports.rawSocket, "udp")]: {},
+    [portKey(ports.query, "udp")]: {},
+    [portKey(ports.rcon, "tcp")]: {}, // 8081 telnet
+  };
+  const bindings: Record<string, Array<{ HostPort: string }>> = {
+    [portKey(ports.game, "tcp")]: [{ HostPort: String(ports.game) }],
+    [portKey(ports.game, "udp")]: [{ HostPort: String(ports.game) }],
+    [portKey(ports.rawSocket, "udp")]: [{ HostPort: String(ports.rawSocket) }],
+    [portKey(ports.query, "udp")]: [{ HostPort: String(ports.query) }],
+    [portKey(ports.rcon, "tcp")]: [{ HostPort: String(ports.rcon) }],
+  };
+
+  const hostNet = env.GAME_HOST_NETWORK;
+  return {
+    name: containerName(input.serverId, input.game, input.sessionName),
+    Image: IMAGES[Game.SEVEN_DAYS],
+    Hostname: containerName(input.serverId, input.game, input.sessionName),
+    Env: sdtdEnv,
+    Labels: serverLabels(input, env.PUBLIC_BASE_URL),
+    ...(hostNet ? {} : { ExposedPorts: exposed }),
+    HostConfig: {
+      Binds: binds,
+      ...(hostNet ? { NetworkMode: "host" } : { PortBindings: bindings }),
+      RestartPolicy: { Name: "no" }, // manager watchdog owns restarts
+      Memory: input.ramLimitMb ? input.ramLimitMb * 1024 * 1024 : undefined,
+      NanoCpus: input.cpuLimit ? Math.round(input.cpuLimit * 1e9) : undefined,
+    },
+    ...(hostNet ? {} : { NetworkingConfig: { EndpointsConfig: { [ARK_NETWORK]: {} } } }),
+  };
+}
+
+/**
+ * Render 7 Days to Die's sdtdserver.xml from a server's config. First-class fields
+ * (name, join password, ports, telnet, max players, GameWorld from the map) plus the
+ * catalog's gameplay properties. XML values are escaped. LinuxGSM launches the server
+ * with -configfile pointing at this file.
+ */
+export function renderSdtdServerXml(input: {
+  sessionName: string;
+  serverPassword: string;
+  adminPassword: string;
+  maxPlayers: number;
+  map: string;
+  gamePort: number;
+  telnetPort: number;
+  catalog: SettingsCatalog;
+  config: ServerConfigValues;
+}): string {
+  const esc = (v: unknown) =>
+    String(v)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  const props: Record<string, string | number> = {
+    ServerName: input.sessionName,
+    ServerDescription: "",
+    ServerPassword: input.serverPassword,
+    ServerVisibility: 2, // 2 = public (listed), 1 = friends, 0 = not listed
+    ServerPort: input.gamePort,
+    ServerMaxPlayerCount: input.maxPlayers,
+    GameWorld: input.map, // Navezgane or RWG
+    // Telnet is 7DTD's remote console. Gated with the admin password + failed-login limit.
+    TelnetEnabled: "true",
+    TelnetPort: input.telnetPort,
+    TelnetPassword: input.adminPassword,
+    TelnetFailedLoginLimit: 10,
+    TelnetFailedLoginsBlocktime: 10,
+    // WebDashboard/control panel off by default (we don't publish 8080).
+    WebDashboardEnabled: "false",
+  };
+  // Catalog gameplay properties (GameName, difficulty, rates, …).
+  for (const def of input.catalog.settings) {
+    const raw = input.config.values?.[def.key] ?? def.default;
+    if (raw === undefined || raw === null) continue;
+    props[def.emitAs ?? def.key] = typeof raw === "boolean" ? (raw ? "true" : "false") : (raw as string | number);
+  }
+  const lines = Object.entries(props).map(
+    ([name, value]) => `  <property name="${name}" value="${esc(value)}"/>`,
+  );
+  return `<?xml version="1.0"?>\n<ServerSettings>\n${lines.join("\n")}\n</ServerSettings>\n`;
 }

@@ -152,6 +152,13 @@ const VALHEIM_GROUPS: SettingGroup[] = [
   { id: "server", label: "Server", Icon: SlidersHorizontal, cats: ["Server"] },
 ];
 
+// 7 Days to Die (rendered into sdtdserver.xml) → its own tabs.
+const SEVEN_DAYS_GROUPS: SettingGroup[] = [
+  { id: "world", label: "World", Icon: MapIcon, cats: ["World"] },
+  { id: "gameplay", label: "Gameplay", Icon: Swords, cats: ["Gameplay"] },
+  { id: "rates", label: "Rates", Icon: Gauge, cats: ["Rates"] },
+];
+
 /**
  * Map-specific categories → fragments of the server's map name they apply to.
  * A setting in one of these only shows when the managed server's map matches,
@@ -202,7 +209,9 @@ export function SettingsForm({
               ? BEDROCK_GROUPS
               : game === Game.VALHEIM
                 ? VALHEIM_GROUPS
-                : ARK_GROUPS;
+                : game === Game.SEVEN_DAYS
+                  ? SEVEN_DAYS_GROUPS
+                  : ARK_GROUPS;
   const MAPPED_CATS = new Set(GROUPS.flatMap((g) => g.cats));
 
   // A map-specific category is shown only when the server's map matches it.

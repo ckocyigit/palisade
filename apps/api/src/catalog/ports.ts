@@ -57,11 +57,18 @@ export const BEDROCK_PORTS: PortSet = { game: 19132, rawSocket: 19133, query: 19
  */
 export const VALHEIM_PORTS: PortSet = { game: 2456, rawSocket: 2458, query: 2457, rcon: 0 };
 
+/**
+ * 7 Days to Die: game port 26900 (TCP + UDP), plus 26901 + 26902 UDP; the telnet
+ * console (the game's "RCON") is on 8081/TCP — carried in the rcon slot.
+ */
+export const SEVEN_DAYS_PORTS: PortSet = { game: 26900, rawSocket: 26901, query: 26902, rcon: 8081 };
+
 /** The fixed port block a new server gets, by game. */
 export function portsFor(game: Game): PortSet {
   if (game === Game.MINECRAFT) return MINECRAFT_PORTS;
   if (game === Game.ICARUS) return ICARUS_PORTS;
   if (game === Game.BEDROCK) return BEDROCK_PORTS;
   if (game === Game.VALHEIM) return VALHEIM_PORTS;
+  if (game === Game.SEVEN_DAYS) return SEVEN_DAYS_PORTS;
   return FIXED_PORTS;
 }

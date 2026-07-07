@@ -39,7 +39,7 @@ import { StateMachineService } from "./state-machine.service";
 import { ManagerSettingsService, SettingKeys } from "../manager-settings/manager-settings.service";
 import { LogCaptureService, LOG_CAPTURE_MAX } from "../logs/log-capture.service";
 import { BackupsService } from "../backups/backups.service";
-import { buildContainerSpec } from "./runtime-spec";
+import { buildContainerSpec, renderSdtdServerXml } from "./runtime-spec";
 import { portsFor } from "../catalog/ports";
 import { LocalPaths } from "../common/paths";
 import { containerName } from "../common/naming";
@@ -105,6 +105,9 @@ export const READY_RE_BY_GAME: Record<Game, RegExp> = {
   // Valheim logs "Game server connected" when it registers + is joinable (no RCON).
   // PROVISIONAL — confirm against a real boot.
   [Game.VALHEIM]: /Game server connected/i,
+  // 7 Days to Die logs "StartGame done" (and starts telnet) when the world is up.
+  // PROVISIONAL — confirm against a real boot.
+  [Game.SEVEN_DAYS]: /StartGame done|GameServer\.LogOn successful|Started Telnet on/i,
 };
 
 /** The "server is now joinable" log-marker regex for a game. */
@@ -855,10 +858,17 @@ export class ServersService implements OnApplicationBootstrap {
     // Conan persists to SQLite and Minecraft never logs ARK's "World Save Complete"
     // — issue their save (save-all for Minecraft, via the game-aware wrapper) and
     // return; the container's SIGTERM handler flushes the rest on shutdown. Waiting
-    // for the ARK log here would just burn the timeout. Icarus, Bedrock and Valheim
-    // have NO RCON at all — they autosave and flush on the container's graceful
-    // shutdown, so there's nothing to issue; just return and let SIGTERM handle it.
-    if (game === Game.ICARUS || game === Game.BEDROCK || game === Game.VALHEIM) return;
+    // for the ARK log here would just burn the timeout. Icarus/Bedrock/Valheim have NO
+    // RCON at all, and 7DTD's console is telnet (not wired here) — they autosave and
+    // flush on the container's graceful shutdown, so there's nothing to issue; just
+    // return and let SIGTERM handle it.
+    if (
+      game === Game.ICARUS ||
+      game === Game.BEDROCK ||
+      game === Game.VALHEIM ||
+      game === Game.SEVEN_DAYS
+    )
+      return;
     if (!containerId || game === Game.CONAN || game === Game.MINECRAFT) {
       await this.rcon.saveWorld(id).catch(() => undefined);
       return;
@@ -1007,6 +1017,28 @@ export class ServersService implements OnApplicationBootstrap {
       game === Game.VALHEIM
     )
       return;
+
+    // 7 Days to Die's settings live in sdtdserver.xml (not env vars) — render it into
+    // the serverfiles bind. The vinanrra image chowns the mounts to PUID/PGID on
+    // startup, so a root-written file becomes readable to the runtime user.
+    if (game === Game.SEVEN_DAYS) {
+      const dir = join(env.DATA_DIR, "instances", server.id, "serverfiles");
+      await mkdir(dir, { recursive: true });
+      const xml = renderSdtdServerXml({
+        sessionName: server.name,
+        serverPassword: server.serverPasswordEnc ? this.crypto.decrypt(server.serverPasswordEnc) : "",
+        adminPassword: server.adminPasswordEnc ? this.crypto.decrypt(server.adminPasswordEnc) : "changeme",
+        maxPlayers: server.maxPlayers,
+        map: server.map,
+        gamePort: server.gamePort,
+        telnetPort: server.rconPort,
+        catalog: this.catalog.getCatalog(Game.SEVEN_DAYS),
+        config: JSON.parse(server.configJson) as ServerConfigValues,
+      });
+      await writeFile(join(dir, "sdtdserver.xml"), xml, "utf8");
+      return;
+    }
+
     const base = join(env.DATA_DIR, "instances", server.id);
     // Both images bind the instance dir as their data root. ASA (POK) installs
     // at the root → config under ShooterGame/Saved/Config/WindowsServer; ASE

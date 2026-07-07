@@ -400,3 +400,67 @@ describe("buildContainerSpec (Valheim / lloesche)", () => {
     expect(env).toContain("CROSSPLAY=true");
   });
 });
+
+async function buildSdtd() {
+  const { buildContainerSpec } = await import("./runtime-spec");
+  const { SEVEN_DAYS_CATALOG } = await import("../catalog/seven-days.catalog");
+  return buildContainerSpec({
+    serverId: "srv1",
+    game: Game.SEVEN_DAYS,
+    map: "Navezgane",
+    sessionName: "My 7DTD Server",
+    ports: { game: 26900, rawSocket: 26901, query: 26902, rcon: 8081 },
+    maxPlayers: 8,
+    adminPassword: "secret",
+    serverPassword: "pw",
+    modIds: [],
+    cluster: null,
+    config: { values: {} },
+    catalog: SEVEN_DAYS_CATALOG,
+  });
+}
+
+describe("buildContainerSpec (7 Days to Die / vinanrra)", () => {
+  it("drives LinuxGSM via env + publishes 26900 tcp/udp, 26901/26902 udp, 8081 telnet", async () => {
+    const spec = await buildSdtd();
+    expect(spec.Image).toBe("vinanrra/7dtd-server:latest");
+    const env = envOf(spec);
+    expect(env).toContain("START_MODE=1");
+    expect(env).toContain("BACKUP=NO"); // manager owns backups
+    expect(env).toContain("MONITOR=NO");
+    const pb = spec.HostConfig?.PortBindings ?? {};
+    expect(pb["26900/tcp"]).toEqual([{ HostPort: "26900" }]);
+    expect(pb["26900/udp"]).toEqual([{ HostPort: "26900" }]);
+    expect(pb["8081/tcp"]).toEqual([{ HostPort: "8081" }]); // telnet console
+    const binds = spec.HostConfig?.Binds ?? [];
+    expect(binds.some((b) => b.endsWith(":/home/sdtdserver/serverfiles"))).toBe(true);
+    expect(binds.some((b) => b.endsWith(":/home/sdtdserver/.local/share/7DaysToDie"))).toBe(true);
+  });
+});
+
+describe("renderSdtdServerXml", () => {
+  it("renders first-class fields + telnet + catalog props, escaping values", async () => {
+    const { renderSdtdServerXml } = await import("./runtime-spec");
+    const { SEVEN_DAYS_CATALOG } = await import("../catalog/seven-days.catalog");
+    const xml = renderSdtdServerXml({
+      sessionName: 'Bob & "Friends"',
+      serverPassword: "joinpw",
+      adminPassword: "telnetpw",
+      maxPlayers: 8,
+      map: "Navezgane",
+      gamePort: 26900,
+      telnetPort: 8081,
+      catalog: SEVEN_DAYS_CATALOG,
+      config: { values: { GameDifficulty: 4 } },
+    });
+    expect(xml).toContain('<property name="ServerName" value="Bob &amp; &quot;Friends&quot;"/>');
+    expect(xml).toContain('<property name="ServerPassword" value="joinpw"/>');
+    expect(xml).toContain('<property name="ServerPort" value="26900"/>');
+    expect(xml).toContain('<property name="GameWorld" value="Navezgane"/>');
+    expect(xml).toContain('<property name="TelnetEnabled" value="true"/>');
+    expect(xml).toContain('<property name="TelnetPort" value="8081"/>');
+    expect(xml).toContain('<property name="TelnetPassword" value="telnetpw"/>');
+    expect(xml).toContain('<property name="GameDifficulty" value="4"/>'); // catalog override
+    expect(xml).toContain('<property name="XPMultiplier" value="100"/>'); // catalog default
+  });
+});
