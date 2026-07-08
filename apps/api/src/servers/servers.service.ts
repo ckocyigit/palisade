@@ -6,8 +6,9 @@ import {
   NotFoundException,
   type OnApplicationBootstrap,
 } from "@nestjs/common";
-import { mkdir, writeFile, rm, cp, chmod, chown } from "node:fs/promises";
-import { execFile } from "node:child_process";
+import { mkdir, writeFile, rm, cp, chmod, chown, stat } from "node:fs/promises";
+import { execFile, spawn } from "node:child_process";
+import type { Readable } from "node:stream";
 import { join, dirname, relative, sep } from "node:path";
 import {
   Game,
@@ -589,7 +590,8 @@ export class ServersService implements OnApplicationBootstrap {
     return { copied };
   }
 
-  async remove(id: string): Promise<void> {
+  async remove(id: string, opts: { wipeFiles?: boolean } = {}): Promise<void> {
+    const wipeFiles = opts.wipeFiles ?? true;
     const server = await this.prisma.server.findUnique({ where: { id } });
     if (!server) throw new NotFoundException("Server not found");
     await this.withLock(id, async () => {
@@ -600,22 +602,50 @@ export class ServersService implements OnApplicationBootstrap {
       await this.prisma.portAllocation.deleteMany({ where: { serverId: id } });
       await this.prisma.server.delete({ where: { id } });
     });
-    // Delete server entirely: wipe the on-disk instance (game files + saves) AND the
-    // backups so nothing is orphaned on the array. Best-effort — the DB row is already
-    // gone, so a filesystem hiccup can't strand a half-deleted server. The UI warns
-    // this is permanent before calling here.
-    const env = loadEnv();
-    await rm(LocalPaths.instanceRoot(id), { recursive: true, force: true }).catch((e) =>
-      this.logger.warn(`Delete: instance dir cleanup failed for ${id}: ${(e as Error).message}`),
-    );
-    await rm(join(env.DATA_DIR, "backups", id), { recursive: true, force: true }).catch((e) =>
-      this.logger.warn(`Delete: backups cleanup failed for ${id}: ${(e as Error).message}`),
-    );
+    // With wipeFiles (the default), delete the server entirely: the on-disk instance
+    // (game files + saves) AND the backups, so nothing is orphaned on the array.
+    // Best-effort — the DB row is already gone, so a filesystem hiccup can't strand a
+    // half-deleted server. The UI asks before calling here; unchecking the wipe keeps
+    // the files on disk for a later manual import.
+    if (wipeFiles) {
+      const env = loadEnv();
+      await rm(LocalPaths.instanceRoot(id), { recursive: true, force: true }).catch((e) =>
+        this.logger.warn(`Delete: instance dir cleanup failed for ${id}: ${(e as Error).message}`),
+      );
+      await rm(join(env.DATA_DIR, "backups", id), { recursive: true, force: true }).catch((e) =>
+        this.logger.warn(`Delete: backups cleanup failed for ${id}: ${(e as Error).message}`),
+      );
+    }
     await this.events.emit({
       type: EventType.ServerDeleted,
-      message: `Deleted server "${server.name}"`,
+      message: `Deleted server "${server.name}"${wipeFiles ? "" : " (files kept on disk)"}`,
       serverId: id,
     });
+  }
+
+  /**
+   * Stream the server's save data (the per-game saveSubpaths — worlds, configs,
+   * prospects…) as a tar.gz, so it can be downloaded through the browser before a
+   * delete. Only the save subpaths are archived, NOT the multi-GB game install.
+   * Returns the spawned tar's stdout; tar reads the (often root-owned) files fine
+   * because the manager runs as root.
+   */
+  async downloadSaves(id: string): Promise<{ stream: Readable; filename: string }> {
+    const server = await this.prisma.server.findUnique({ where: { id } });
+    if (!server) throw new NotFoundException("Server not found");
+    const root = LocalPaths.instanceRoot(id);
+    const existing: string[] = [];
+    for (const sub of LocalPaths.saveSubpaths(server.game as Game)) {
+      if (await stat(join(root, sub)).catch(() => null)) existing.push(sub);
+    }
+    if (existing.length === 0) {
+      throw new NotFoundException("No save data on disk yet — the server hasn't created a world.");
+    }
+    const tar = spawn("tar", ["czf", "-", "-C", root, ...existing]);
+    tar.on("error", (e) => this.logger.warn(`Save download tar failed for ${id}: ${e.message}`));
+    tar.stderr.on("data", (d: Buffer) => this.logger.warn(`tar: ${d.toString().trim()}`));
+    const slug = server.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "server";
+    return { stream: tar.stdout, filename: `${slug}-saves.tar.gz` };
   }
 
   // ── Lifecycle ───────────────────────────────────────────────────────────---

@@ -77,6 +77,40 @@ export const apiPut = <T>(path: string, body?: unknown) =>
   api<T>(path, { method: "PUT", body: body ? JSON.stringify(body) : undefined });
 export const apiDelete = <T>(path: string) => api<T>(path, { method: "DELETE" });
 
+/**
+ * Authenticated file download through the browser: fetches the endpoint (the
+ * Authorization header can't ride on a plain <a href>), then hands the blob to a
+ * temporary object-URL anchor so the browser saves it. Filename comes from the
+ * response's Content-Disposition, with a fallback.
+ */
+export async function apiDownload(path: string, fallbackName: string): Promise<void> {
+  const token = getToken();
+  const res = await fetch(`/api${path}`, {
+    headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+  });
+  if (!res.ok) {
+    handleAuthFailure(res.status, path);
+    let message = res.statusText;
+    try {
+      message = (await res.json()).message ?? message;
+    } catch {
+      /* ignore */
+    }
+    throw new ApiError(res.status, Array.isArray(message) ? message.join(", ") : message);
+  }
+  const blob = await res.blob();
+  const cd = res.headers.get("Content-Disposition") ?? "";
+  const filename = cd.match(/filename="?([^";]+)"?/)?.[1] ?? fallbackName;
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
 /** Multipart file upload — must NOT set Content-Type (the browser adds the
  *  multipart boundary itself). Field name is "file" (matches FileInterceptor). */
 export async function apiUpload<T = unknown>(path: string, file: File): Promise<T> {

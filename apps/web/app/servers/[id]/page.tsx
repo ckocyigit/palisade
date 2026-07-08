@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Play, Square, RotateCw, Download, Loader2, Pencil, Check, X, Trash2, AlertTriangle } from "lucide-react";
 import { mapLabel, Game, ServerState, type ServerSummary, type ServerConfigValues } from "@ark/shared";
-import { apiGet, apiPost, apiPatch, apiDelete } from "@/lib/api";
+import { apiGet, apiPost, apiPatch, apiDelete, apiDownload } from "@/lib/api";
 import { useRealtime } from "@/lib/socket";
 import { StateBadge } from "@/components/state-badge";
 import { UpdateBadge } from "@/components/update-badge";
@@ -124,10 +124,10 @@ export default function ServerDetailPage({ params }: { params: Promise<{ id: str
     }
   };
 
-  const doDelete = async () => {
+  const doDelete = async (wipeFiles: boolean) => {
     setDeleting(true);
     try {
-      await apiDelete(`/servers/${id}`);
+      await apiDelete(`/servers/${id}?wipe=${wipeFiles ? "1" : "0"}`);
       router.push("/"); // gone — back to the server list
     } catch (e) {
       alert((e as Error).message);
@@ -295,9 +295,10 @@ export default function ServerDetailPage({ params }: { params: Promise<{ id: str
 }
 
 /**
- * Destructive-delete confirmation. Wiping a server removes the container, the
- * on-disk game files + world saves, AND its backups — irreversible — so we gate it
- * behind typing the server's name (a deliberate friction, like GitHub's repo delete).
+ * Destructive-delete confirmation, gated behind typing the server's name (a
+ * deliberate friction, like GitHub's repo delete). The user chooses whether the
+ * on-disk game data + backups are wiped too, and can download the world saves
+ * through the browser first (a tar.gz of the save dirs, not the game install).
  */
 function DeleteConfirm({
   server,
@@ -308,11 +309,29 @@ function DeleteConfirm({
   server: ServerSummary;
   deleting: boolean;
   onCancel: () => void;
-  onConfirm: () => void;
+  onConfirm: (wipeFiles: boolean) => void;
 }) {
   const [typed, setTyped] = useState("");
+  const [wipeFiles, setWipeFiles] = useState(true);
+  const [downloading, setDownloading] = useState(false);
+  const [downloaded, setDownloaded] = useState(false);
+  const [dlError, setDlError] = useState<string | null>(null);
   const armed = typed.trim() === server.name.trim();
   const isLive = server.state === ServerState.Running || server.state === ServerState.Starting;
+
+  const download = async () => {
+    setDownloading(true);
+    setDlError(null);
+    try {
+      await apiDownload(`/servers/${server.id}/download`, `${server.name}-saves.tar.gz`);
+      setDownloaded(true);
+    } catch (e) {
+      setDlError((e as Error).message);
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={onCancel}>
       <div
@@ -324,15 +343,54 @@ function DeleteConfirm({
           <h2 className="text-lg font-semibold">Delete “{server.name}”?</h2>
         </div>
         <p className="text-sm leading-snug text-slate-300">
-          This permanently removes the server, its <span className="text-slate-100">game files</span> and{" "}
-          <span className="text-slate-100">world saves</span>, and{" "}
-          <span className="text-slate-100">all of its backups</span>. This cannot be undone.
+          This permanently removes the server{isLive ? " (it will be force-stopped first)" : ""}. This cannot
+          be undone.
         </p>
-        {isLive && (
-          <p className="mt-2 text-sm font-medium text-rose-300">
-            The server is running — it will be force-stopped first.
-          </p>
-        )}
+
+        {/* Keep-or-wipe choice */}
+        <label className="mt-4 flex cursor-pointer items-start gap-2.5 rounded-md border border-ark-border bg-ark-bg p-3">
+          <input
+            type="checkbox"
+            className="mt-0.5 h-4 w-4 accent-rose-500"
+            checked={wipeFiles}
+            onChange={(e) => setWipeFiles(e.target.checked)}
+          />
+          <span className="text-sm leading-snug">
+            <span className="font-medium text-slate-100">
+              Also delete the game data and backups from disk
+            </span>
+            <span className="mt-0.5 block text-xs text-slate-500">
+              {wipeFiles
+                ? "The game files, world saves, and every backup are wiped. Uncheck to keep them on disk after the server is removed."
+                : "Files stay on the server's disk (instances/ and backups/) for manual recovery later."}
+            </span>
+          </span>
+        </label>
+
+        {/* Download-before-delete */}
+        <div className="mt-3 flex items-center justify-between gap-3 rounded-md border border-ark-border bg-ark-bg p-3">
+          <div className="min-w-0 text-xs leading-snug text-slate-400">
+            <span className="block font-medium text-slate-200">Keep a copy first?</span>
+            Download the world saves (tar.gz) through your browser before deleting.
+          </div>
+          <button
+            type="button"
+            className="btn-secondary shrink-0"
+            onClick={download}
+            disabled={downloading || deleting}
+          >
+            {downloading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : downloaded ? (
+              <Check className="h-4 w-4 text-ark-accent" />
+            ) : (
+              <Download className="h-4 w-4" />
+            )}
+            {downloading ? "Preparing…" : downloaded ? "Downloaded" : "Download"}
+          </button>
+        </div>
+        {dlError && <p className="mt-1.5 text-xs text-rose-400">{dlError}</p>}
+
         <label className="label mt-4">
           Type <span className="font-mono text-slate-200">{server.name}</span> to confirm
         </label>
@@ -342,7 +400,7 @@ function DeleteConfirm({
           value={typed}
           onChange={(e) => setTyped(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === "Enter" && armed && !deleting) onConfirm();
+            if (e.key === "Enter" && armed && !deleting) onConfirm(wipeFiles);
             if (e.key === "Escape") onCancel();
           }}
           placeholder={server.name}
@@ -354,10 +412,10 @@ function DeleteConfirm({
           <button
             className="inline-flex items-center gap-1.5 rounded-md bg-rose-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-rose-500 disabled:opacity-40"
             disabled={!armed || deleting}
-            onClick={onConfirm}
+            onClick={() => onConfirm(wipeFiles)}
           >
             {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-            {deleting ? "Deleting…" : "Delete permanently"}
+            {deleting ? "Deleting…" : wipeFiles ? "Delete everything" : "Delete server, keep files"}
           </button>
         </div>
       </div>

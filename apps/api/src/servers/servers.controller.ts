@@ -1,5 +1,21 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  Res,
+  StreamableFile,
+} from "@nestjs/common";
 import { IsArray, IsBoolean, IsOptional, IsString } from "class-validator";
+
+/** The slice of Express's Response we use (avoids a @types/express dependency). */
+interface HeaderSettable {
+  setHeader(name: string, value: string): void;
+}
 import type { CreateServerDto, UpdateServerDto } from "@ark/shared";
 import { ServersService } from "./servers.service";
 import { EventsService } from "../events/events.service";
@@ -83,9 +99,20 @@ export class ServersController {
     return this.servers.update(id, body as UpdateServerDto);
   }
 
+  /** Delete the server. ?wipe=0 keeps the on-disk game data + backups (default wipes). */
   @Delete(":id")
-  remove(@Param("id") id: string) {
-    return this.servers.remove(id);
+  remove(@Param("id") id: string, @Query("wipe") wipe?: string) {
+    return this.servers.remove(id, { wipeFiles: wipe !== "0" && wipe !== "false" });
+  }
+
+  /** Stream the server's save data (worlds/configs, NOT the game install) as a
+   *  tar.gz — offered in the delete dialog so data can be kept before wiping. */
+  @Get(":id/download")
+  async download(@Param("id") id: string, @Res({ passthrough: true }) res: HeaderSettable) {
+    const { stream, filename } = await this.servers.downloadSaves(id);
+    res.setHeader("Content-Type", "application/gzip");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    return new StreamableFile(stream);
   }
 
   /** Copy this server's settings/mods onto the given (same-game) targets. */
