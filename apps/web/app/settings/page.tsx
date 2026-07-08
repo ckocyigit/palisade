@@ -14,6 +14,9 @@ export default function SettingsPage() {
   const [discordWebhookUrl, setDiscordWebhookUrl] = useState("");
   const [backupKeep, setBackupKeep] = useState("10");
   const [autoStop, setAutoStop] = useState(true);
+  const [pfsenseHost, setPfsenseHost] = useState("");
+  const [pfsenseApiKey, setPfsenseApiKey] = useState("");
+  const [pfsenseTargetIp, setPfsenseTargetIp] = useState("");
   const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState(false);
   const [testMsg, setTestMsg] = useState<string | null>(null);
@@ -28,6 +31,8 @@ export default function SettingsPage() {
         if (typeof v.discord_webhook_url === "string") setDiscordWebhookUrl(v.discord_webhook_url);
         if (typeof v.backup_keep === "string" && v.backup_keep) setBackupKeep(v.backup_keep);
         setAutoStop(v.auto_stop_on_start !== "false"); // default on when unset
+        if (typeof v.pfsense_host === "string") setPfsenseHost(v.pfsense_host);
+        if (typeof v.pfsense_target_ip === "string") setPfsenseTargetIp(v.pfsense_target_ip);
       })
       .catch(() => undefined);
   };
@@ -46,10 +51,14 @@ export default function SettingsPage() {
       const keep = parseInt(backupKeep, 10);
       if (Number.isFinite(keep) && keep >= 1) settingsBody.backupKeep = keep;
       settingsBody.autoStopOnStart = autoStop;
+      settingsBody.pfsenseHost = pfsenseHost;
+      settingsBody.pfsenseTargetIp = pfsenseTargetIp;
+      if (pfsenseApiKey) settingsBody.pfsenseApiKey = pfsenseApiKey;
       if (Object.keys(settingsBody).length) await apiPatch("/settings", settingsBody);
       await apiPatch("/notifications/webhook", { discordWebhookUrl });
       setCurseForgeApiKey("");
       setSteamWebApiKey("");
+      setPfsenseApiKey("");
       setSaved(true);
       load();
     } catch (err) {
@@ -113,6 +122,42 @@ export default function SettingsPage() {
           </div>
           {testMsg && <p className="mt-2 text-sm text-slate-400">{testMsg}</p>}
         </div>
+      </div>
+
+      <div className="card space-y-4">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-ark-accent2">
+          pfSense port forwarding
+        </h2>
+        <p className="text-xs text-slate-500">
+          With these set, each server&apos;s Overview gets a one-click &quot;Forward ports&quot; button that
+          creates the WAN NAT rules (with auto pass rules) via the pfSense REST API package.
+        </p>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div>
+            <label className="label">pfSense host / IP</label>
+            <input
+              className="input"
+              placeholder="10.10.10.1"
+              value={pfsenseHost}
+              onChange={(e) => setPfsenseHost(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="label">Forward to (this machine&apos;s LAN IP)</label>
+            <input
+              className="input"
+              placeholder="10.10.10.10"
+              value={pfsenseTargetIp}
+              onChange={(e) => setPfsenseTargetIp(e.target.value)}
+            />
+          </div>
+        </div>
+        <SecretField
+          label="pfSense REST API key"
+          value={pfsenseApiKey}
+          onChange={setPfsenseApiKey}
+          configured={configured("pfsense_api_key")}
+        />
       </div>
 
       <div className="card space-y-4">

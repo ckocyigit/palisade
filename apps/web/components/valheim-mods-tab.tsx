@@ -16,7 +16,13 @@ interface TsResult {
   packageUrl: string;
 }
 type SearchResp = { total: number; page: number; pageSize: number; results: TsResult[] };
-type Status = { mods: string[] };
+interface InstalledMod {
+  name: string;
+  installedVersion: string | null;
+  latestVersion: string | null;
+  updateAvailable: boolean;
+}
+type Status = { mods: InstalledMod[] };
 
 const fmt = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}k` : String(n));
 
@@ -70,7 +76,7 @@ export function ValheimModsTab({ serverId }: { serverId: string }) {
     };
   }, [query, runSearch]);
 
-  const installed = new Set(status?.mods ?? []);
+  const installed = new Set((status?.mods ?? []).map((m) => m.name));
 
   const install = async (fullName: string) => {
     setInstalling(fullName);
@@ -105,15 +111,32 @@ export function ValheimModsTab({ serverId }: { serverId: string }) {
         {status && status.mods.length > 0 ? (
           <ul className="divide-y divide-ark-border/50 text-sm">
             {status.mods.map((m) => (
-              <li key={m} className="flex items-center justify-between gap-3 py-1.5">
-                <span className="truncate font-mono text-slate-200">{m}</span>
-                <button
-                  className="shrink-0 text-slate-500 hover:text-rose-400"
-                  title="Remove"
-                  onClick={() => remove(m)}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
+              <li key={m.name} className="flex items-center justify-between gap-3 py-1.5">
+                <span className="min-w-0 truncate font-mono text-slate-200">
+                  {m.name}
+                  {m.installedVersion && (
+                    <span className="ml-1.5 text-xs text-slate-500">v{m.installedVersion}</span>
+                  )}
+                </span>
+                <span className="flex shrink-0 items-center gap-2">
+                  {m.updateAvailable && (
+                    <button
+                      className="rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-300 hover:bg-amber-500/25 disabled:opacity-50"
+                      title={`Update to v${m.latestVersion}`}
+                      disabled={installing === m.name}
+                      onClick={() => install(m.name)}
+                    >
+                      {installing === m.name ? "Updating…" : `Update → v${m.latestVersion}`}
+                    </button>
+                  )}
+                  <button
+                    className="text-slate-500 hover:text-rose-400"
+                    title="Remove"
+                    onClick={() => remove(m.name)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </span>
               </li>
             ))}
           </ul>

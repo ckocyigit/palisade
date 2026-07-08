@@ -10,6 +10,9 @@ class UpdateSettingsBody {
   @IsOptional() @IsString() steamWebApiKey?: string;
   @IsOptional() @IsInt() @Min(1) @Max(500) backupKeep?: number;
   @IsOptional() @IsBoolean() autoStopOnStart?: boolean;
+  @IsOptional() @IsString() pfsenseHost?: string;
+  @IsOptional() @IsString() pfsenseApiKey?: string;
+  @IsOptional() @IsString() pfsenseTargetIp?: string;
 }
 
 @Controller("settings")
@@ -42,6 +45,10 @@ export class ManagerSettingsController {
       await this.settings.set(SettingKeys.BackupKeep, String(body.backupKeep));
     if (body.autoStopOnStart !== undefined)
       await this.settings.set(SettingKeys.AutoStopOnStart, String(body.autoStopOnStart));
+    if (body.pfsenseHost !== undefined) await this.settings.set(SettingKeys.PfsenseHost, body.pfsenseHost);
+    if (body.pfsenseApiKey) await this.settings.set(SettingKeys.PfsenseApiKey, body.pfsenseApiKey);
+    if (body.pfsenseTargetIp !== undefined)
+      await this.settings.set(SettingKeys.PfsenseTargetIp, body.pfsenseTargetIp);
     return this.settings.publicView();
   }
 }

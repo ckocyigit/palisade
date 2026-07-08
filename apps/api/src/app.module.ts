@@ -17,6 +17,8 @@ import { BedrockModsModule } from "./bedrockmods/bedrockmods.module";
 import { SevenDaysModsModule } from "./sevendaysmods/sevendaysmods.module";
 import { ValheimModsModule } from "./valheimmods/valheimmods.module";
 import { AccessListsModule } from "./accesslists/accesslists.module";
+import { DbBackupModule } from "./dbbackup/dbbackup.module";
+import { PortForwardsModule } from "./portforwards/portforwards.module";
 import { ClustersModule } from "./clusters/clusters.module";
 import { BackupsModule } from "./backups/backups.module";
 import { NotificationsModule } from "./notifications/notifications.module";
@@ -48,6 +50,8 @@ import { HealthController } from "./health/health.controller";
     SevenDaysModsModule,
     ValheimModsModule,
     AccessListsModule,
+    DbBackupModule,
+    PortForwardsModule,
     ClustersModule,
     BackupsModule,
     NotificationsModule,

@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common";
-import { mkdir, readdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { tmpdir } from "node:os";
@@ -132,15 +132,41 @@ export class ValheimModsService {
   }
 
   // ── Install / manage ─────────────────────────────────────────────────────────
+  /** Installed mods with their versions and whether Thunderstore has a newer one.
+   *  Installed version comes from each mod folder's manifest.json (shipped in every
+   *  Thunderstore zip); latest comes from the cached index. */
   async status(id: string) {
     await this.valheimServer(id);
-    let mods: string[] = [];
+    let names: string[] = [];
     try {
       const entries = await readdir(this.pluginsDir(id), { withFileTypes: true });
-      mods = entries.filter((e) => e.isDirectory()).map((e) => e.name);
+      names = entries.filter((e) => e.isDirectory()).map((e) => e.name);
     } catch {
       /* not created yet */
     }
+    // Best-effort index for latest versions — an offline Thunderstore must not
+    // break the installed list.
+    await this.ensureIndex().catch(() => undefined);
+    const mods = await Promise.all(
+      names.map(async (name) => {
+        let installedVersion: string | null = null;
+        try {
+          const manifest = JSON.parse(
+            await readFile(join(this.pluginsDir(id), name, "manifest.json"), "utf8"),
+          ) as { version_number?: string };
+          installedVersion = manifest.version_number ?? null;
+        } catch {
+          /* hand-dropped mod without a manifest */
+        }
+        const latest = this.index?.byFullName.get(name)?.versionNumber ?? null;
+        return {
+          name,
+          installedVersion,
+          latestVersion: latest,
+          updateAvailable: Boolean(installedVersion && latest && installedVersion !== latest),
+        };
+      }),
+    );
     return { mods };
   }
 

@@ -526,13 +526,20 @@ export class ServersService implements OnApplicationBootstrap {
         launchChanged = true;
       }
     }
-    if (dto.ramLimitMb !== undefined && dto.ramLimitMb !== existing.ramLimitMb) {
-      data.ramLimitMb = dto.ramLimitMb;
-      launchChanged = true;
+    // Resource limits: 0 clears the cap (stored as null = unlimited).
+    if (dto.ramLimitMb !== undefined) {
+      const next = dto.ramLimitMb === 0 ? null : dto.ramLimitMb;
+      if (next !== existing.ramLimitMb) {
+        data.ramLimitMb = next;
+        launchChanged = true;
+      }
     }
-    if (dto.cpuLimit !== undefined && dto.cpuLimit !== existing.cpuLimit) {
-      data.cpuLimit = dto.cpuLimit;
-      launchChanged = true;
+    if (dto.cpuLimit !== undefined) {
+      const next = dto.cpuLimit === 0 ? null : dto.cpuLimit;
+      if (next !== existing.cpuLimit) {
+        data.cpuLimit = next;
+        launchChanged = true;
+      }
     }
     // Passwords: diff against the DECRYPTED current value — re-encrypting always
     // produces different ciphertext, so the stored blob can't be compared directly.

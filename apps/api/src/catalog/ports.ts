@@ -82,6 +82,57 @@ export function serverPortSet(game: Game, ports: PortSet): Set<number> {
   return set;
 }
 
+export interface ForwardPort {
+  port: number;
+  proto: "udp" | "tcp";
+  label: string;
+}
+
+/**
+ * The PLAYER-FACING ports a game needs forwarded on the router (what we've been
+ * creating on pfSense by hand per game). Deliberately excludes admin/internal
+ * ports: RCON, 7DTD telnet, and Valheim's HTTP status endpoint stay LAN-only.
+ */
+export function forwardSpec(game: Game, ports: PortSet): ForwardPort[] {
+  switch (game) {
+    case Game.MINECRAFT:
+      return [{ port: ports.game, proto: "tcp", label: "game" }];
+    case Game.BEDROCK:
+      return [
+        { port: ports.game, proto: "udp", label: "game (IPv4)" },
+        { port: ports.rawSocket, proto: "udp", label: "game (IPv6)" },
+      ];
+    case Game.ICARUS:
+    case Game.ENSHROUDED:
+      return [
+        { port: ports.game, proto: "udp", label: "game" },
+        { port: ports.query, proto: "udp", label: "query (server browser)" },
+      ];
+    case Game.VALHEIM:
+      return [
+        { port: ports.game, proto: "udp", label: "game" },
+        { port: ports.query, proto: "udp", label: "query (server browser)" },
+        { port: ports.rawSocket, proto: "udp", label: "crossplay" },
+      ];
+    case Game.SEVEN_DAYS:
+      return [
+        { port: ports.game, proto: "tcp", label: "game (tcp)" },
+        { port: ports.game, proto: "udp", label: "game (udp)" },
+        { port: ports.rawSocket, proto: "udp", label: "game +1" },
+        { port: ports.query, proto: "udp", label: "query (server browser)" },
+      ];
+    case Game.PALWORLD:
+      return [{ port: ports.game, proto: "udp", label: "game" }];
+    default:
+      // ARK family + Conan: game + raw socket + query, all UDP.
+      return [
+        { port: ports.game, proto: "udp", label: "game" },
+        { port: ports.rawSocket, proto: "udp", label: "raw socket" },
+        { port: ports.query, proto: "udp", label: "query (server browser)" },
+      ];
+  }
+}
+
 /** The fixed port block a new server gets, by game. */
 export function portsFor(game: Game): PortSet {
   if (game === Game.MINECRAFT) return MINECRAFT_PORTS;

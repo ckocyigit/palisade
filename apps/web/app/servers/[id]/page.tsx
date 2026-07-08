@@ -17,6 +17,8 @@ import { ResourcesPanel } from "@/components/resources-panel";
 import { ServerAccessCard } from "@/components/server-access-card";
 import { AccessListsCard } from "@/components/access-lists-card";
 import { PortsCard } from "@/components/ports-card";
+import { GeneralCard } from "@/components/general-card";
+import { PortForwardsCard } from "@/components/port-forwards-card";
 import { LogsTab } from "@/components/logs-tab";
 import { ScheduleList } from "@/components/schedule-list";
 import { ModsTab } from "@/components/mods-tab";
@@ -485,8 +487,10 @@ function Overview({ server, onChanged }: { server: ServerSummary; onChanged: () 
           className="mt-3 max-w-sm"
         />
       </div>
+      <GeneralCard server={server} onSaved={onChanged} />
       <ServerAccessCard server={server} onSaved={onChanged} />
       <PortsCard server={server} onSaved={onChanged} />
+      <PortForwardsCard serverId={server.id} />
       {/* File-managed access lists (Valheim/Bedrock/7DTD); RCON games use the Console. */}
       {(isValheim || isBedrock || isSdtd) && <AccessListsCard serverId={server.id} />}
     </div>

@@ -3,6 +3,14 @@ import { useEffect, useState } from "react";
 import { Cpu, MemoryStick, HardDrive, Users } from "lucide-react";
 import { ServerState, type ServerStatsDetail } from "@ark/shared";
 import { apiGet } from "@/lib/api";
+import { Sparkline } from "@/components/sparkline";
+
+interface HistorySample {
+  at: string;
+  cpuPercent: number | null;
+  memUsedMb: number | null;
+  playersOnline: number | null;
+}
 
 const POLL_MS = 4000;
 const fmt = (mb: number | null | undefined) =>
@@ -12,6 +20,18 @@ const fmt = (mb: number | null | undefined) =>
  *  Polls while Starting/Running (paused when the tab is hidden). */
 export function ResourcesPanel({ serverId, state }: { serverId: string; state: ServerState }) {
   const [stats, setStats] = useState<ServerStatsDetail | null>(null);
+  const [history, setHistory] = useState<HistorySample[]>([]);
+
+  // History sparklines refresh at the sampler's own cadence (30 s).
+  useEffect(() => {
+    const tick = () =>
+      apiGet<{ samples: HistorySample[] }>(`/servers/${serverId}/history`)
+        .then(({ samples }) => setHistory(samples))
+        .catch(() => undefined);
+    void tick();
+    const id = setInterval(tick, 30_000);
+    return () => clearInterval(id);
+  }, [serverId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -56,18 +76,31 @@ export function ResourcesPanel({ serverId, state }: { serverId: string; state: S
         {liveState && <span className="text-xs text-slate-500">live · every {POLL_MS / 1000}s</span>}
       </div>
       <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-        <Metric
-          icon={<Users className="h-4 w-4" />}
-          label="Players online"
-          value={live && stats?.playersOnline != null ? String(stats.playersOnline) : "—"}
-          sub={stats?.playersMax != null ? `of ${stats.playersMax} slots` : undefined}
-        />
-        <Metric
-          icon={<Cpu className="h-4 w-4" />}
-          label="CPU (this server)"
-          value={live && stats?.cpuPercent != null ? `${stats.cpuPercent}%` : "—"}
-          sub={host?.cpuPercent != null ? `machine ${host.cpuPercent}%` : undefined}
-        />
+        <div>
+          <Metric
+            icon={<Users className="h-4 w-4" />}
+            label="Players online"
+            value={live && stats?.playersOnline != null ? String(stats.playersOnline) : "—"}
+            sub={stats?.playersMax != null ? `of ${stats.playersMax} slots` : undefined}
+          />
+          {history.length > 1 && (
+            <Sparkline points={history.map((s) => ({ at: s.at, value: s.playersOnline }))} />
+          )}
+        </div>
+        <div>
+          <Metric
+            icon={<Cpu className="h-4 w-4" />}
+            label="CPU (this server)"
+            value={live && stats?.cpuPercent != null ? `${stats.cpuPercent}%` : "—"}
+            sub={host?.cpuPercent != null ? `machine ${host.cpuPercent}%` : undefined}
+          />
+          {history.length > 1 && (
+            <Sparkline
+              points={history.map((s) => ({ at: s.at, value: s.cpuPercent }))}
+              format={(v) => `${Math.round(v)}%`}
+            />
+          )}
+        </div>
         <div>
           <Metric
             icon={<MemoryStick className="h-4 w-4" />}
@@ -82,6 +115,9 @@ export function ResourcesPanel({ serverId, state }: { serverId: string; state: S
                 style={{ width: `${memPct}%` }}
               />
             </div>
+          )}
+          {history.length > 1 && (
+            <Sparkline points={history.map((s) => ({ at: s.at, value: s.memUsedMb }))} format={fmt} />
           )}
         </div>
         <Metric

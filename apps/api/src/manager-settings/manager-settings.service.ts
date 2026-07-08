@@ -11,13 +11,21 @@ export const SettingKeys = {
   DiscordWebhook: "discord_webhook_url",
   BackupKeep: "backup_keep",
   AutoStopOnStart: "auto_stop_on_start",
+  // pfSense REST API (jaredhendrickson13 package) for one-click port-forwards.
+  PfsenseHost: "pfsense_host",
+  PfsenseApiKey: "pfsense_api_key", // secret
+  PfsenseTargetIp: "pfsense_target_ip", // the LAN IP the game servers bind on
   Initialized: "initialized",
 } as const;
 
 /** Default number of backups kept per server (newest N) when unset. */
 export const DEFAULT_BACKUP_KEEP = 10;
 
-const SECRET_KEYS = new Set<string>([SettingKeys.CurseForgeApiKey, SettingKeys.SteamWebApiKey]);
+const SECRET_KEYS = new Set<string>([
+  SettingKeys.CurseForgeApiKey,
+  SettingKeys.SteamWebApiKey,
+  SettingKeys.PfsenseApiKey,
+]);
 
 /** Fallback timezone when the user hasn't picked one yet (matches the web default). */
 export const DEFAULT_TIMEZONE = "America/Chicago";

@@ -37,8 +37,9 @@ export class UpdateServerBody {
   @IsOptional() @IsInt() @Min(1024) rconPort?: number;
   @IsOptional() @IsString() clusterId?: string | null;
   @IsOptional() @IsArray() modIds?: number[];
-  @IsOptional() @IsInt() @Min(512) ramLimitMb?: number;
-  @IsOptional() @IsNumber() @Min(0.5) cpuLimit?: number;
+  /** 0 clears the limit (unlimited). */
+  @IsOptional() @IsInt() @Min(0) ramLimitMb?: number;
+  @IsOptional() @IsNumber() @Min(0) cpuLimit?: number;
   @IsOptional() @IsString() adminPassword?: string;
   @IsOptional() @IsString() serverPassword?: string;
   @IsOptional() @IsString() spectatorPassword?: string;

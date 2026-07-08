@@ -18,6 +18,7 @@ interface HeaderSettable {
 }
 import type { CreateServerDto, UpdateServerDto } from "@ark/shared";
 import { ServersService } from "./servers.service";
+import { HistoryService } from "./history.service";
 import { EventsService } from "../events/events.service";
 import { CreateServerBody, UpdateServerBody } from "./servers.dto";
 
@@ -39,6 +40,7 @@ export class ServersController {
   constructor(
     private readonly servers: ServersService,
     private readonly events: EventsService,
+    private readonly history: HistoryService,
   ) {}
 
   @Get()
@@ -84,6 +86,12 @@ export class ServersController {
   @Get(":id/stats")
   stats(@Param("id") id: string) {
     return this.servers.stats(id);
+  }
+
+  /** Last hour of 30 s resource/player samples (in-memory; empty after a manager restart). */
+  @Get(":id/history")
+  historyOf(@Param("id") id: string) {
+    return { samples: this.history.get(id) };
   }
 
   @Get(":id/events")
