@@ -12,12 +12,13 @@ const TTL_MS = 20_000;
 /** How long a failed lookup is remembered (avoids hammering a booting server). */
 const NEG_TTL_MS = 15_000;
 
-/** Games whose query port answers standard Steam A2S_INFO. */
+/** Games whose query port answers standard Steam A2S_INFO. NOT Valheim — its
+ *  queries go through Steam's relay, so it never answers direct A2S (verified
+ *  live); it gets the lloesche image's HTTP status endpoint instead. */
 const A2S_GAMES = new Set<Game>([
   Game.ASE,
   Game.CONAN,
   Game.ICARUS,
-  Game.VALHEIM,
   Game.SEVEN_DAYS,
   Game.ENSHROUDED,
 ]);
@@ -80,6 +81,23 @@ export class PlayersService {
       if (A2S_GAMES.has(game)) {
         const count = await a2sInfo(host, server.queryPort);
         return { online: count.online, max: count.max ?? server.maxPlayers };
+      }
+      if (game === Game.VALHEIM) {
+        // The lloesche image's built-in HTTP status endpoint (STATUS_HTTP), on
+        // game port + 3 by our convention (set in buildValheimSpec).
+        const controller = new AbortController();
+        const t = setTimeout(() => controller.abort(), 2500);
+        try {
+          const res = await fetch(`http://${host}:${server.gamePort + 3}/status.json`, {
+            signal: controller.signal,
+          });
+          if (!res.ok) return null;
+          const j = (await res.json()) as { player_count?: number; players?: unknown[] };
+          const online = j.player_count ?? (Array.isArray(j.players) ? j.players.length : null);
+          return online === null ? null : { online, max: server.maxPlayers };
+        } finally {
+          clearTimeout(t);
+        }
       }
       if (game === Game.BEDROCK) {
         const count = await raknetPing(host, server.gamePort);

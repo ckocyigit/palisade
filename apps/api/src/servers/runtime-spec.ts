@@ -746,6 +746,11 @@ function buildValheimSpec(input: RuntimeSpecInput): Docker.ContainerCreateOption
     `SERVER_NAME=${input.sessionName}`,
     `SERVER_PASS=${serverPassword(input)}`, // >= 5 chars, enforced at create
     `SERVER_PORT=${ports.game}`, // query is game+1 (2457), crossplay is game+2 (2458)
+    // Valheim doesn't answer direct A2S on its query port (queries go through
+    // Steam's relay), so the manager reads player counts from the image's own
+    // HTTP status endpoint instead — game port + 3 by convention (see PlayersService).
+    `STATUS_HTTP=true`,
+    `STATUS_HTTP_PORT=${ports.game + 3}`,
     ...valheimCatalogEnv(input),
     ...(serverArgs ? [`SERVER_ARGS=${serverArgs}`] : []),
   ];
@@ -768,6 +773,7 @@ function buildValheimSpec(input: RuntimeSpecInput): Docker.ContainerCreateOption
             [portKey(ports.game, "udp")]: {},
             [portKey(ports.query, "udp")]: {},
             [portKey(ports.rawSocket, "udp")]: {},
+            [portKey(ports.game + 3, "tcp")]: {}, // HTTP status (player counts)
           },
         }),
     HostConfig: {
@@ -779,6 +785,7 @@ function buildValheimSpec(input: RuntimeSpecInput): Docker.ContainerCreateOption
               [portKey(ports.game, "udp")]: [{ HostPort: String(ports.game) }],
               [portKey(ports.query, "udp")]: [{ HostPort: String(ports.query) }],
               [portKey(ports.rawSocket, "udp")]: [{ HostPort: String(ports.rawSocket) }],
+              [portKey(ports.game + 3, "tcp")]: [{ HostPort: String(ports.game + 3) }],
             },
           }),
       RestartPolicy: { Name: "no" }, // manager watchdog owns restarts
