@@ -384,10 +384,13 @@ describe("buildContainerSpec (Valheim / lloesche)", () => {
     expect(env).toContain("SERVER_PASS=hunter2"); // the join password (>= 5 chars)
     expect(env).toContain("SERVER_PORT=2456");
     expect(env).toContain("WORLD_NAME=Dedicated");
-    // game + query + crossplay are UDP; no RCON/TCP
+    // game + query + crossplay are UDP; the only TCP port is the HTTP status
+    // endpoint (game + 3) the manager reads player counts from. No RCON.
     expect(spec.HostConfig?.PortBindings?.["2456/udp"]).toEqual([{ HostPort: "2456" }]);
     expect(spec.HostConfig?.PortBindings?.["2457/udp"]).toEqual([{ HostPort: "2457" }]);
-    expect(Object.keys(spec.HostConfig?.PortBindings ?? {}).some((k) => k.endsWith("/tcp"))).toBe(false);
+    expect(spec.HostConfig?.PortBindings?.["2459/tcp"]).toEqual([{ HostPort: "2459" }]);
+    expect(env).toContain("STATUS_HTTP=true");
+    expect(env).toContain("STATUS_HTTP_PORT=2459");
     // config + worlds and the game install bound separately
     const binds = spec.HostConfig?.Binds ?? [];
     expect(binds.some((b) => b.endsWith(":/config"))).toBe(true);
