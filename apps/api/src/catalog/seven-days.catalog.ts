@@ -314,7 +314,11 @@ const settings: SettingDef[] = [
   sset("PersistentPlayerProfiles", "Whitelist (persistent profiles)", "Players", "bool", false, {
     help: "Only players an admin has allowed on the server can join.",
   }),
-  sset("QuestProgressDailyLimit", "Daily quest limit", "Players", "int", 8, {
+  // NOTE: an unknown property name is FATAL to the 7DTD server ("Error parsing
+  // configfile property X: Unknown config option" → shutdown), so names here must
+  // match the game's GamePref names exactly. This one is QuestProgression…, not
+  // QuestProgress… (caught live).
+  sset("QuestProgressionDailyLimit", "Daily quest limit", "Players", "int", 8, {
     min: 0,
     max: 64,
     help: "Max quests a player can complete for rewards per day (0 = unlimited).",
