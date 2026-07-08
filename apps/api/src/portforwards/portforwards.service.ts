@@ -166,6 +166,22 @@ export class PortForwardsService {
     return ip;
   }
 
+  /** Validate the configured host + API key + target (for the Settings page's Test
+   *  button): reaches the API, reports the WAN address and how many NAT rules exist. */
+  async testConnection(): Promise<{ ok: boolean; message: string }> {
+    const cfg = await this.config();
+    if (!cfg) return { ok: false, message: "Fill in the pfSense host, API key, and target IP first." };
+    try {
+      const [rules, wanIp] = await Promise.all([this.rules(cfg), this.wanIp(cfg)]);
+      return {
+        ok: true,
+        message: `Connected to ${cfg.host} — WAN ${wanIp ?? "unknown"}, ${rules.length} NAT rule${rules.length === 1 ? "" : "s"} found. Forwards will target ${cfg.targetIp}.`,
+      };
+    } catch (e) {
+      return { ok: false, message: `Could not reach the pfSense API: ${(e as Error).message}` };
+    }
+  }
+
   /** The WAN rule matching a forward's port/proto — target-matching rules first. */
   private matchRule(rules: NatRule[], f: ForwardPort, targetIp: string): NatRule | undefined {
     const candidates = rules.filter(

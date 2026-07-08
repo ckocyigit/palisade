@@ -17,6 +17,7 @@ export default function SettingsPage() {
   const [pfsenseHost, setPfsenseHost] = useState("");
   const [pfsenseApiKey, setPfsenseApiKey] = useState("");
   const [pfsenseTargetIp, setPfsenseTargetIp] = useState("");
+  const [pfTestMsg, setPfTestMsg] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState(false);
   const [testMsg, setTestMsg] = useState<string | null>(null);
@@ -78,6 +79,17 @@ export default function SettingsPage() {
     }
   };
 
+  // Tests the SAVED settings — remind the user to hit Save first if fields are dirty.
+  const testPfsense = async () => {
+    setPfTestMsg("Testing…");
+    try {
+      const res = await apiPost<{ ok: boolean; message: string }>("/pfsense/test");
+      setPfTestMsg(`${res.ok ? "✓ " : "✗ "}${res.message}`);
+    } catch (err) {
+      setPfTestMsg((err as Error).message);
+    }
+  };
+
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <h1 className="flex items-center gap-2 text-xl font-semibold">
@@ -129,15 +141,25 @@ export default function SettingsPage() {
           pfSense port forwarding
         </h2>
         <p className="text-xs text-slate-500">
-          With these set, each server&apos;s Overview gets a one-click &quot;Forward ports&quot; button that
-          creates the WAN NAT rules (with auto pass rules) via the pfSense REST API package.
+          With these set, each server&apos;s Overview gets one-click WAN port-forward management. Requires
+          the free{" "}
+          <a
+            href="https://pfrest.org/"
+            target="_blank"
+            rel="noreferrer"
+            className="text-ark-accent hover:underline"
+          >
+            pfSense REST API package
+          </a>{" "}
+          on your router (System → REST API → generate an API key). Works with any pfSense — nothing is
+          tied to a specific network.
         </p>
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
             <label className="label">pfSense host / IP</label>
             <input
               className="input"
-              placeholder="10.10.10.1"
+              placeholder="e.g. 192.168.1.1 (your router)"
               value={pfsenseHost}
               onChange={(e) => setPfsenseHost(e.target.value)}
             />
@@ -146,7 +168,7 @@ export default function SettingsPage() {
             <label className="label">Forward to (this machine&apos;s LAN IP)</label>
             <input
               className="input"
-              placeholder="10.10.10.10"
+              placeholder="e.g. 192.168.1.50 (this server box)"
               value={pfsenseTargetIp}
               onChange={(e) => setPfsenseTargetIp(e.target.value)}
             />
@@ -158,6 +180,12 @@ export default function SettingsPage() {
           onChange={setPfsenseApiKey}
           configured={configured("pfsense_api_key")}
         />
+        <div>
+          <button type="button" className="btn-secondary" onClick={testPfsense}>
+            <Send className="h-4 w-4" /> Test connection
+          </button>
+          {pfTestMsg && <p className="mt-2 text-sm text-slate-400">{pfTestMsg}</p>}
+        </div>
       </div>
 
       <div className="card space-y-4">

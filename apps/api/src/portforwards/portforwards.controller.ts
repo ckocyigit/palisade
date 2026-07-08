@@ -2,6 +2,18 @@ import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from "@nestj
 import { IsBoolean, IsIn, IsInt } from "class-validator";
 import { PortForwardsService } from "./portforwards.service";
 
+/** Settings-scoped pfSense utilities (not tied to a server). */
+@Controller("pfsense")
+export class PfsenseController {
+  constructor(private readonly portforwards: PortForwardsService) {}
+
+  /** Validate the configured pfSense host + API key + target IP. */
+  @Post("test")
+  test() {
+    return this.portforwards.testConnection();
+  }
+}
+
 class ToggleForwardBody {
   @IsInt() port!: number;
   @IsIn(["udp", "tcp"]) proto!: "udp" | "tcp";
