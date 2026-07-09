@@ -47,6 +47,7 @@ export function UnofficialListHelp({
   const ats = game === Game.ATS || game === Game.ETS2;
   const terraria = game === Game.TERRARIA;
   const factorio = game === Game.FACTORIO;
+  const rust = game === Game.RUST;
   const passwordHint = hasJoinPassword
     ? "your server has a join password"
     : "ON only if you set a join password";
@@ -65,7 +66,7 @@ export function UnofficialListHelp({
             ? "Add it to your server list"
             : satisfactory
               ? "Add it to your Server Manager"
-            : conan || palworld || icarus || valheim || sdtd || enshrouded || zomboid || vrising || sotf || lif || ats || factorio
+            : conan || palworld || icarus || valheim || sdtd || enshrouded || zomboid || vrising || sotf || lif || ats || factorio || rust
               ? "Find it in the in-game server browser"
               : "Find it on the in-game Unofficial list"}
         </span>
@@ -73,7 +74,20 @@ export function UnofficialListHelp({
       </button>
 
       {open &&
-        (factorio ? (
+        (rust ? (
+          <div className="space-y-1.5 border-t border-ark-border px-2.5 py-2 text-xs">
+            <p className="text-slate-400">
+              In <span className="text-slate-200">the server browser</span>:
+            </p>
+            <FilterRow state="on" label="Community tab — search by name (may take minutes to list)" />
+            <FilterRow state="on" label="Or press F1 → connect ip:port (console)" />
+            <p className="pt-1 leading-snug text-slate-400">
+              Search the name <span className="font-mono text-slate-200">{serverName}</span>, or F1-console{" "}
+              <span className="font-mono text-slate-200">connect &lt;ip&gt;:{queryPort ? queryPort - 1 : 28015}</span>.
+              Vanilla Rust has no join password — access control is bans/whitelist plugins.
+            </p>
+          </div>
+        ) : factorio ? (
           <div className="space-y-1.5 border-t border-ark-border px-2.5 py-2 text-xs">
             <p className="text-slate-400">
               In <span className="text-slate-200">Multiplayer</span>:

@@ -80,6 +80,11 @@ export const IMAGES: Record<Game, string> = {
   // supported natively; RCON password comes from config/rconpw; server-settings
   // .json is merge-patched by the manager. Full Source RCON console.
   [Game.FACTORIO]: "factoriotools/factorio:stable",
+  // didstopia/rust-server — installs/updates the Rust dedicated server (app 258550,
+  // ~12 GB) via SteamCMD on boot into the /steamcmd/rust bind. Env-driven; we run
+  // RCON in LEGACY Source mode (RUST_RCON_WEB=0) so the existing RCON stack works.
+  // Optional Oxide/uMod via env toggle.
+  [Game.RUST]: "didstopia/rust-server:latest",
 };
 
 /** POK keeps all instance data (install + saves + config) under this path. */
@@ -165,6 +170,10 @@ export const TERRARIA_LOGS_DIR = "/tshock/logs";
 /** Factorio (factoriotools): one volume holds saves/, config/, mods/, scenarios/. */
 export const FACTORIO_DATA_DIR = "/factorio";
 
+/** Rust (didstopia): one volume holds the ~12 GB install AND the server identity
+ *  (saves/cfg under server/docker) — backups target just the identity dir. */
+export const RUST_DATA_DIR = "/steamcmd/rust";
+
 /**
  * The uid/gid each image runs the server as. Neither chowns its mounts fully
  * (POK never does; hermsi only chowns the volume root), so the manager makes the
@@ -191,6 +200,7 @@ export const SERVER_UID: Record<Game, number> = {
   [Game.CORE_KEEPER]: 1000, // escaping's steam user, remapped via PUID/PGID (we pass ours)
   [Game.TERRARIA]: 0, // the ryshe image runs as root
   [Game.FACTORIO]: 845, // the image's "factorio" user, remapped via PUID/PGID (we pass ours)
+  [Game.RUST]: 0, // didstopia runs as root
 };
 export const SERVER_GID: Record<Game, number> = {
   [Game.ASA]: 7777,
@@ -213,4 +223,5 @@ export const SERVER_GID: Record<Game, number> = {
   [Game.CORE_KEEPER]: 1000,
   [Game.TERRARIA]: 0,
   [Game.FACTORIO]: 845,
+  [Game.RUST]: 0,
 };

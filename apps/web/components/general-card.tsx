@@ -25,6 +25,7 @@ import {
   CORE_KEEPER_OFFICIAL_MAPS,
   TERRARIA_OFFICIAL_MAPS,
   FACTORIO_OFFICIAL_MAPS,
+  RUST_OFFICIAL_MAPS,
   mapLabel,
   type ServerSummary,
 } from "@ark/shared";
@@ -51,6 +52,7 @@ const MAPS_FOR: Record<Game, readonly string[]> = {
   [Game.CORE_KEEPER]: CORE_KEEPER_OFFICIAL_MAPS,
   [Game.TERRARIA]: TERRARIA_OFFICIAL_MAPS,
   [Game.FACTORIO]: FACTORIO_OFFICIAL_MAPS,
+  [Game.RUST]: RUST_OFFICIAL_MAPS,
 };
 
 /**

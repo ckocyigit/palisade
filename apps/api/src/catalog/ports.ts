@@ -152,6 +152,13 @@ export const TERRARIA_PORTS: PortSet = { game: 7777, rawSocket: 7779, query: 777
 export const FACTORIO_PORTS: PortSet = { game: 34197, rawSocket: 34198, query: 34197, rcon: 27015 };
 
 /**
+ * Rust: game 28015 UDP, Steam query 28016 UDP, RCON 28016 TCP (same number,
+ * different protocol — Rust's convention), Rust+ companion app 28082 TCP
+ * (carried in the rawSocket slot).
+ */
+export const RUST_PORTS: PortSet = { game: 28015, rawSocket: 28082, query: 28016, rcon: 28016 };
+
+/**
  * Every host port a server binds (skipping unused 0 slots — e.g. rcon on no-RCON
  * games). Valheim also binds its HTTP status endpoint on game + 3, and Minecraft's
  * query column mirrors the game port (the set dedupes it). Used by the start-time
@@ -252,6 +259,12 @@ export function forwardSpec(game: Game, ports: PortSet): ForwardPort[] {
       return [{ port: ports.game, proto: "tcp", label: "game" }]; // REST stays LAN-only
     case Game.FACTORIO:
       return [{ port: ports.game, proto: "udp", label: "game" }]; // RCON stays LAN-only
+    case Game.RUST:
+      return [
+        { port: ports.game, proto: "udp", label: "game" },
+        { port: ports.query, proto: "udp", label: "query (server browser)" },
+        { port: ports.rawSocket, proto: "tcp", label: "Rust+ companion app" },
+      ]; // RCON (28016 tcp) stays LAN-only
     default:
       // ARK family + Conan: game + raw socket + query, all UDP.
       return [
@@ -280,5 +293,6 @@ export function portsFor(game: Game): PortSet {
   if (game === Game.CORE_KEEPER) return CORE_KEEPER_PORTS;
   if (game === Game.TERRARIA) return TERRARIA_PORTS;
   if (game === Game.FACTORIO) return FACTORIO_PORTS;
+  if (game === Game.RUST) return RUST_PORTS;
   return FIXED_PORTS;
 }

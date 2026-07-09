@@ -41,6 +41,7 @@ const RCON_POLL_GAMES = new Set<Game>([
   Game.SEVEN_DAYS,
   Game.ZOMBOID,
   Game.FACTORIO,
+  Game.RUST,
 ]);
 
 const ACTIONS_BY_GAME: Record<Game, PlayerAction[]> = {
@@ -64,6 +65,7 @@ const ACTIONS_BY_GAME: Record<Game, PlayerAction[]> = {
   [Game.CORE_KEEPER]: [], // no console; joins are gated by the secret Game ID
   [Game.TERRARIA]: [], // stdin console only; capture-only from join log lines
   [Game.FACTORIO]: ["kick", "ban", "whitelist", "admin"], // /kick /ban /whitelist add /promote
+  [Game.RUST]: ["kick", "ban", "admin"], // kickid / banid / moderatorid (steamid-based)
 };
 
 const CAPTURE_NOTES: Partial<Record<Game, string>> = {
@@ -151,6 +153,14 @@ export class SightingsService implements OnModuleInit {
       return [...out.matchAll(/^\s*\d+\.\s*id=\S+?,\s*([^,]+?),.*?pltfmid=([^,\s]+)/gim)].map((m) => ({
         name: m[1]!.trim(),
         playerId: m[2],
+      }));
+    }
+    if (game === Game.RUST) {
+      // `status` → "76561198000000000 \"Name\" ..." player rows after a header.
+      const out = await this.rcon.exec(serverId, "status");
+      return [...out.matchAll(/^\s*(\d{17})\s+"([^"]+)"/gm)].map((m) => ({
+        name: m[2]!,
+        playerId: m[1],
       }));
     }
     if (game === Game.CONAN) {
@@ -317,6 +327,12 @@ export class SightingsService implements OnModuleInit {
       await this.rcon.exec(serverId, `/promote ${name}`);
       return { ok: true, detail: `${name} promoted to admin` };
     }
+    if (game === Game.RUST && action === "admin") {
+      if (!playerId) throw new BadRequestException(`No SteamID captured for ${name} yet — try while they're online.`);
+      await this.rcon.exec(serverId, `moderatorid ${playerId} "${name}"`);
+      await this.rcon.exec(serverId, "server.writecfg");
+      return { ok: true, detail: `${name} is now a moderator` };
+    }
     throw new BadRequestException(`${action} isn't supported for this game`);
   }
 
@@ -350,7 +366,7 @@ export class SightingsService implements OnModuleInit {
 
   /** What the game's kick/ban commands take: ids where required, else the name. */
   private rconSubject(game: Game, name: string, playerId: string | null): string {
-    if (game === Game.ASA || game === Game.ASE || game === Game.PALWORLD) {
+    if (game === Game.ASA || game === Game.ASE || game === Game.PALWORLD || game === Game.RUST) {
       if (!playerId) {
         throw new BadRequestException(`No player id captured for ${name} yet — try while they're online.`);
       }

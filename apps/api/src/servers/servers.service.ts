@@ -157,8 +157,11 @@ export const READY_RE_BY_GAME: Record<Game, RegExp> = {
   // the world is loaded and joinable — CONFIRMED live (both lines real).
   [Game.TERRARIA]: /Listening on port|Server started/i,
   // Factorio logs a state transition to InGame exactly when the map is loaded and
-  // the server takes joins. PROVISIONAL — confirm against a real boot.
+  // the server takes joins — CONFIRMED live.
   [Game.FACTORIO]: /changing state from\(CreatingGame\) to\(InGame\)/i,
+  // Rust prints "Server startup complete" after the (long) map generation, right
+  // as it takes joins. PROVISIONAL — confirm against a real boot.
+  [Game.RUST]: /Server startup complete/i,
 };
 
 /** The "server is now joinable" log-marker regex for a game. */
@@ -1162,7 +1165,8 @@ export class ServersService implements OnApplicationBootstrap {
       game === Game.CONAN ||
       game === Game.MINECRAFT ||
       game === Game.ZOMBOID ||
-      game === Game.FACTORIO
+      game === Game.FACTORIO ||
+      game === Game.RUST
     ) {
       await this.rcon.saveWorld(id).catch(() => undefined);
       return;

@@ -40,6 +40,7 @@ import {
   TERRARIA_PLUGINS_DIR,
   TERRARIA_LOGS_DIR,
   FACTORIO_DATA_DIR,
+  RUST_DATA_DIR,
 } from "../common/images";
 // (ATS reuses the ich777 wrapper mount points LIF_STEAMCMD_DIR / LIF_SERVERFILES_DIR.)
 import { ZOMBOID_STEAM_PORTS } from "../catalog/ports";
@@ -94,6 +95,7 @@ export function buildContainerSpec(input: RuntimeSpecInput): Docker.ContainerCre
   if (input.game === Game.CORE_KEEPER) return buildCoreKeeperSpec(input);
   if (input.game === Game.TERRARIA) return buildTerrariaSpec(input);
   if (input.game === Game.FACTORIO) return buildFactorioSpec(input);
+  if (input.game === Game.RUST) return buildRustSpec(input);
   return buildAseSpec(input);
 }
 
@@ -1558,6 +1560,83 @@ export function patchFactorioSettings(
     }
   }
   return JSON.stringify(doc, null, 2);
+}
+
+/** The repurposed map field -> Rust's RUST_SERVER_WORLDSIZE. */
+const RUST_WORLD_SIZES: Record<string, number> = {
+  RustSmall: 2000,
+  RustMedium: 3000,
+  RustLarge: 4500,
+};
+
+/**
+ * Rust — drive the didstopia image. SteamCMD installs/updates the ~12 GB server
+ * on boot into the single /steamcmd/rust bind (identity "docker" holds the map
+ * save + cfg). RCON runs in LEGACY Source mode (RUST_RCON_WEB=0) so the existing
+ * RCON stack speaks it; the Steam query (A2S) answers on 28016/udp while RCON
+ * shares the number on TCP. This image wants booleans as "1"/"0".
+ */
+function buildRustSpec(input: RuntimeSpecInput): Docker.ContainerCreateOptions {
+  const env = loadEnv();
+  const { ports } = input;
+
+  const rustEnv = [
+    `TZ=${input.timezone || env.TZ}`,
+    `RUST_SERVER_NAME=${input.sessionName}`,
+    `RUST_SERVER_IDENTITY=docker`,
+    `RUST_SERVER_PORT=${ports.game}`,
+    `RUST_SERVER_QUERYPORT=${ports.query}`,
+    `RUST_RCON_WEB=0`, // legacy Source RCON — our stack speaks it
+    `RUST_RCON_PORT=${ports.rcon}`,
+    `RUST_RCON_PASSWORD=${input.adminPassword}`,
+    `RUST_APP_PORT=${ports.rawSocket}`, // Rust+ companion
+    `RUST_SERVER_MAXPLAYERS=${input.maxPlayers}`,
+    `RUST_SERVER_WORLDSIZE=${RUST_WORLD_SIZES[input.map] ?? 3000}`,
+  ];
+  for (const def of input.catalog.settings) {
+    if (def.target !== SettingTarget.Env) continue;
+    const raw = input.config.values?.[def.key] ?? def.default;
+    if (raw === undefined || raw === null || raw === "") continue;
+    rustEnv.push(`${def.emitAs ?? def.key}=${typeof raw === "boolean" ? (raw ? "1" : "0") : String(raw)}`);
+  }
+
+  const binds = [`${HostPaths.instanceRoot(input.serverId)}/data:${RUST_DATA_DIR}`];
+
+  const hostNet = env.GAME_HOST_NETWORK;
+  return {
+    name: containerName(input.serverId, input.game, input.sessionName),
+    Image: IMAGES[Game.RUST],
+    Hostname: containerName(input.serverId, input.game, input.sessionName),
+    Env: rustEnv,
+    Labels: serverLabels(input, env.PUBLIC_BASE_URL),
+    ...(hostNet
+      ? {}
+      : {
+          ExposedPorts: {
+            [portKey(ports.game, "udp")]: {},
+            [portKey(ports.query, "udp")]: {},
+            [portKey(ports.rcon, "tcp")]: {},
+            [portKey(ports.rawSocket, "tcp")]: {},
+          },
+        }),
+    HostConfig: {
+      Binds: binds,
+      ...(hostNet
+        ? { NetworkMode: "host" }
+        : {
+            PortBindings: {
+              [portKey(ports.game, "udp")]: [{ HostPort: String(ports.game) }],
+              [portKey(ports.query, "udp")]: [{ HostPort: String(ports.query) }],
+              [portKey(ports.rcon, "tcp")]: [{ HostPort: String(ports.rcon) }],
+              [portKey(ports.rawSocket, "tcp")]: [{ HostPort: String(ports.rawSocket) }],
+            },
+          }),
+      RestartPolicy: { Name: "no" }, // manager watchdog owns restarts
+      Memory: input.ramLimitMb ? input.ramLimitMb * 1024 * 1024 : undefined,
+      NanoCpus: input.cpuLimit ? Math.round(input.cpuLimit * 1e9) : undefined,
+    },
+    ...(hostNet ? {} : { NetworkingConfig: { EndpointsConfig: { [ARK_NETWORK]: {} } } }),
+  };
 }
 
 /** The repurposed map field -> Terraria's -autocreate world size (1/2/3). */

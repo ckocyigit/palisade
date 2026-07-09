@@ -28,6 +28,7 @@ const A2S_GAMES = new Set<Game>([
   Game.LIF,
   Game.ATS,
   Game.ETS2,
+  Game.RUST,
 ]);
 
 /**

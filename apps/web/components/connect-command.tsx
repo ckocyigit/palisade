@@ -292,6 +292,22 @@ export function ConnectCommand({
     );
   }
 
+  if (game === Game.RUST) {
+    return (
+      <div className={className}>
+        <div className="mb-1 flex items-center gap-1.5 text-xs font-medium text-slate-400">
+          <Terminal className="h-3.5 w-3.5" /> F1 console connect (in-game)
+        </div>
+        <CopyRow value={`connect ${hostOr}:${gamePort}`} title="Paste into Rust's F1 console" />
+        <p className="mt-1 text-[11px] leading-snug text-slate-500">
+          In Rust: press <span className="font-mono">F1</span> and paste this, or find the server on the{" "}
+          <span className="font-mono">Community</span> tab by name. Online, friends use your public IP with the
+          same port. Vanilla Rust has no join password.
+        </p>
+      </div>
+    );
+  }
+
   if (game === Game.FACTORIO) {
     return (
       <div className={className}>

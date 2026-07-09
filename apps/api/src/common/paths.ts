@@ -103,6 +103,10 @@ export const LocalPaths = {
       case Game.FACTORIO:
         // saves (incl. autosaves) + the settings JSONs/rconpw + mods.
         return ["data/saves", "data/config", "data/mods"];
+      case Game.RUST:
+        // The server identity (map save, player blueprints, cfg incl. users.cfg)
+        // plus Oxide configs/plugins when enabled; the ~12 GB install is skipped.
+        return ["data/server/docker", "data/oxide"];
       default:
         return ["ShooterGame/Saved"]; // ASA (POK)
     }

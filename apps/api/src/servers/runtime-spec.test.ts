@@ -1188,6 +1188,46 @@ describe("buildContainerSpec + patchFactorioSettings (Factorio / factoriotools)"
   });
 });
 
+describe("buildContainerSpec (Rust / didstopia)", () => {
+  async function buildRust(config: ServerConfigValues, map = "RustSmall") {
+    const { buildContainerSpec } = await import("./runtime-spec");
+    const { RUST_CATALOG } = await import("../catalog/rust.catalog");
+    return buildContainerSpec({
+      serverId: "srv1",
+      game: Game.RUST,
+      map,
+      sessionName: "Rust Bucket",
+      ports: { game: 28015, rawSocket: 28082, query: 28016, rcon: 28016 },
+      maxPlayers: 50,
+      adminPassword: "rconpw",
+      serverPassword: null,
+      modIds: [],
+      cluster: null,
+      config,
+      catalog: RUST_CATALOG,
+    });
+  }
+
+  it("maps the env contract with legacy RCON + world size from the map field", async () => {
+    const spec = await buildRust({ values: { RUST_OXIDE_ENABLED: true } });
+    expect(spec.Image).toBe("didstopia/rust-server:latest");
+    const env = envOf(spec);
+    expect(env).toContain("RUST_SERVER_NAME=Rust Bucket");
+    expect(env).toContain("RUST_RCON_WEB=0"); // legacy Source RCON
+    expect(env).toContain("RUST_RCON_PASSWORD=rconpw");
+    expect(env).toContain("RUST_SERVER_WORLDSIZE=2000"); // RustSmall
+    expect(env).toContain("RUST_SERVER_MAXPLAYERS=50");
+    expect(env).toContain("RUST_OXIDE_ENABLED=1"); // this image wants 1/0 booleans
+    expect(env).toContain("RUST_SERVER_SEED=12345"); // catalog default
+    // game + query udp, rcon + Rust+ app tcp; query and rcon share 28016
+    expect(spec.HostConfig?.PortBindings?.["28015/udp"]).toEqual([{ HostPort: "28015" }]);
+    expect(spec.HostConfig?.PortBindings?.["28016/udp"]).toEqual([{ HostPort: "28016" }]);
+    expect(spec.HostConfig?.PortBindings?.["28016/tcp"]).toEqual([{ HostPort: "28016" }]);
+    expect(spec.HostConfig?.PortBindings?.["28082/tcp"]).toEqual([{ HostPort: "28082" }]);
+    expect((spec.HostConfig?.Binds ?? []).some((b) => b.endsWith(":/steamcmd/rust"))).toBe(true);
+  });
+});
+
 describe("parsePzModIds", () => {
   it("parses 'Mod ID:' lines from a Workshop description (deduped, in order)", async () => {
     const { parsePzModIds } = await import("../mods/mods.service");

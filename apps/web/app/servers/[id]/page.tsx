@@ -167,7 +167,7 @@ export default function ServerDetailPage({ params }: { params: Promise<{ id: str
           ? new Set<Tab>(["Console"]) // no RCON, but a Thunderstore mod browser
           : server.game === Game.ENSHROUDED
             ? new Set<Tab>(["Console", "Mods"]) // no RCON, no mod support
-            : server.game === Game.VRISING || server.game === Game.FACTORIO
+            : server.game === Game.VRISING || server.game === Game.FACTORIO || server.game === Game.RUST
               ? new Set<Tab>(["Mods"]) // RCON console, but no mod browser
               : server.game === Game.SOTF || server.game === Game.SATISFACTORY || server.game === Game.LIF || server.game === Game.ATS || server.game === Game.ETS2 || server.game === Game.CORE_KEEPER || server.game === Game.TERRARIA
                 ? new Set<Tab>(["Console", "Mods"]) // no RCON/console, no mod browser
@@ -454,9 +454,10 @@ function Overview({ server, onChanged }: { server: ServerSummary; onChanged: () 
   const isCoreKeeper = server.game === Game.CORE_KEEPER;
   const isTerraria = server.game === Game.TERRARIA;
   const isFactorio = server.game === Game.FACTORIO;
+  const isRust = server.game === Game.RUST;
   const noQuery = isMc || isBedrock || isSdtd || isZomboid || isSatisfactory || isCoreKeeper || isTerraria || isFactorio; // Valheim/Enshrouded/V Rising have a real query port; Zomboid's + Satisfactory's mirror the game port
   const noRcon = isIcarus || isBedrock || isValheim || isSdtd || isEnshrouded || isSotf || isSatisfactory || isLif || isAts || isCoreKeeper || isTerraria; // 7DTD's console is telnet
-  const noMods = isIcarus || isBedrock || isValheim || isSdtd || isEnshrouded || isVRising || isSotf || isSatisfactory || isLif || isAts || isCoreKeeper || isTerraria || isFactorio;
+  const noMods = isIcarus || isBedrock || isValheim || isSdtd || isEnshrouded || isVRising || isSotf || isSatisfactory || isLif || isAts || isCoreKeeper || isTerraria || isFactorio || isRust;
   const row = (k: string, v: string): [string, string] => [k, v];
   const rows: [string, string][] = [
     row("Game", server.game),

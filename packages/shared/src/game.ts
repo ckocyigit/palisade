@@ -40,6 +40,8 @@ export enum Game {
   TERRARIA = "TERRARIA",
   /** Factorio — factoriotools image (native); server-settings.json + rconpw; full Source RCON. */
   FACTORIO = "FACTORIO",
+  /** Rust — didstopia image (native), env-driven; legacy Source RCON + A2S; Oxide toggle. */
+  RUST = "RUST",
 }
 
 /** Friendly game names for the UI. */
@@ -64,6 +66,7 @@ export const GAME_LABELS: Record<Game, string> = {
   [Game.CORE_KEEPER]: "Core Keeper",
   [Game.TERRARIA]: "Terraria",
   [Game.FACTORIO]: "Factorio",
+  [Game.RUST]: "Rust",
 };
 
 /** SteamCMD app IDs for the dedicated server (anonymous login). */
@@ -106,6 +109,8 @@ export const STEAM_APP_ID: Record<Game, number> = {
   [Game.TERRARIA]: 0,
   // Factorio isn't on SteamCMD — the factoriotools image bundles the headless server. Unused.
   [Game.FACTORIO]: 0,
+  // Rust dedicated server (the didstopia image installs it via SteamCMD on boot).
+  [Game.RUST]: 258550,
 };
 
 /** Steam Workshop "consumer" app ids for mod downloads (ARK: Survival Evolved /
@@ -153,6 +158,7 @@ export const GAME_ICONS: Record<Game, string> = {
   [Game.CORE_KEEPER]: "https://cdn.cloudflare.steamstatic.com/steam/apps/1621690/header.jpg",
   [Game.TERRARIA]: "https://cdn.cloudflare.steamstatic.com/steam/apps/105600/header.jpg",
   [Game.FACTORIO]: "https://cdn.cloudflare.steamstatic.com/steam/apps/427520/header.jpg",
+  [Game.RUST]: "https://cdn.cloudflare.steamstatic.com/steam/apps/252490/header.jpg",
 };
 
 /** CurseForge numeric game id for ASA (used by the mod browser). */
@@ -216,6 +222,8 @@ export const RAM_ESTIMATE_MB: Record<Game, number> = {
   [Game.TERRARIA]: 1500,
   // Factorio's headless server: ~2-4 GB on a megabase, far less early on.
   [Game.FACTORIO]: 3000,
+  // Rust is HUNGRY — ~6 GB on a small map, 10+ on default 3500 worlds.
+  [Game.RUST]: 8000,
 };
 
 /**
@@ -245,6 +253,7 @@ export const MAX_PLAYERS_BY_GAME: Record<Game, number> = {
   [Game.CORE_KEEPER]: 20, // no hard cap; the game is designed for 1-8
   [Game.TERRARIA]: 255, // Terraria's protocol cap
   [Game.FACTORIO]: 100, // no hard cap (0 = unlimited); a sane ceiling
+  [Game.RUST]: 200, // no hard cap; a sane ceiling for self-hosting
 };
 
 /** The default player count the create form pre-fills per game (a sensible starting
@@ -270,6 +279,7 @@ export const DEFAULT_MAX_PLAYERS_BY_GAME: Record<Game, number> = {
   [Game.CORE_KEEPER]: 8,
   [Game.TERRARIA]: 8,
   [Game.FACTORIO]: 10,
+  [Game.RUST]: 50,
 };
 
 /** A password field on the create form: whether to show it at all, its label, an
@@ -332,6 +342,7 @@ export const ADMIN_PASSWORD_META: Record<Game, PasswordFieldMeta> = {
     help: "Palisade talks to TShock's REST API with this token for player counts. Leave empty to disable the REST API.",
   },
   [Game.FACTORIO]: { show: true, label: "RCON password (enables the console)" },
+  [Game.RUST]: { show: true, label: "RCON password (enables the console)" },
 };
 
 /** The join (server) password field, per game. Every game can have one, but Valheim
@@ -379,6 +390,8 @@ export const JOIN_PASSWORD_META: Record<Game, PasswordFieldMeta> = {
   [Game.CORE_KEEPER]: { show: false, label: "" },
   [Game.TERRARIA]: { show: true, label: "Server password (players need it to join)" },
   [Game.FACTORIO]: { show: true, label: "Game password (players need it to join)" },
+  // Vanilla Rust has NO join-password concept — access control is via bans/whitelist plugins.
+  [Game.RUST]: { show: false, label: "" },
 };
 
 /** Default port offsets within a per-server allocation block. */
@@ -501,6 +514,10 @@ export const FACTORIO_OFFICIAL_MAPS = [
   "island",
 ] as const;
 
+/** Rust maps are procedural — we repurpose the map field as the WORLD SIZE the map
+ *  is generated with (RUST_SERVER_WORLDSIZE; bigger = much more RAM). */
+export const RUST_OFFICIAL_MAPS = ["RustSmall", "RustMedium", "RustLarge"] as const;
+
 /** Friendly display names for known level names (raw level → label). */
 export const MAP_LABELS: Record<string, string> = {
   // Conan Exiles
@@ -554,6 +571,10 @@ export const MAP_LABELS: Record<string, string> = {
   "death-world-marathon": "Death world marathon",
   "ribbon-world": "Ribbon world",
   island: "Island",
+  // Rust world sizes (repurposed map field; ~RAM: 6/8/12 GB)
+  RustSmall: "Small map (2000)",
+  RustMedium: "Medium map (3000)",
+  RustLarge: "Large map (4500)",
   // Sons of the Forest game modes (repurposed map field)
   Normal: "Normal (survival)",
   Hard: "Hard (survival)",

@@ -21,6 +21,7 @@ const QUICK_COMMANDS: Partial<Record<Game, string[]>> = {
   [Game.SEVEN_DAYS]: ["listplayers", "gettime", "settime day", "saveworld", "say "],
   [Game.ZOMBOID]: ["players", 'servermsg "', "save", "showoptions", "checkModsNeedUpdate"],
   [Game.FACTORIO]: ["/players online", "/time", "/server-save", "/version", "/admins"],
+  [Game.RUST]: ["status", "say ", "server.save", "serverinfo", "playerlist"],
   [Game.VRISING]: ["announce ", "announcerestart ", "help"],
 };
 
