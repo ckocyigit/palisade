@@ -241,7 +241,7 @@ export function ConnectCommand({
     );
   }
 
-  if (game === Game.ATS) {
+  if (game === Game.ATS || game === Game.ETS2) {
     return (
       <div className={className}>
         <div className="mb-1 flex items-center gap-1.5 text-xs font-medium text-slate-400">
@@ -249,7 +249,7 @@ export function ConnectCommand({
         </div>
         <CopyRow value={`${hostOr}:${gamePort}`} title="Server address for ATS direct search" />
         <p className="mt-1 text-[11px] leading-snug text-slate-500">
-          In American Truck Simulator: <span className="font-mono">Convoy → search sessions</span> — find the
+          In the game: <span className="font-mono">Convoy → search sessions</span> — find the
           server by name (up to 8 players). Everyone needs the same map DLCs as the server's world export.
         </p>
         {joinPassword && (

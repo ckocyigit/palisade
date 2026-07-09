@@ -44,7 +44,7 @@ export function UnofficialListHelp({
   const sotf = game === Game.SOTF;
   const satisfactory = game === Game.SATISFACTORY;
   const lif = game === Game.LIF;
-  const ats = game === Game.ATS;
+  const ats = game === Game.ATS || game === Game.ETS2;
   const passwordHint = hasJoinPassword
     ? "your server has a join password"
     : "ON only if you set a join password";

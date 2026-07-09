@@ -144,6 +144,8 @@ export const READY_RE_BY_GAME: Record<Game, RegExp> = {
   // which the file's timestamps show is <2 s before the session is up (CONFIRMED
   // live). So the stdout init line is the marker; the tiny early window is fine.
   [Game.ATS]: /\[MP\] Server init/i,
+  // ETS2: same engine + wrapper as ATS — same stdout marker.
+  [Game.ETS2]: /\[MP\] Server init/i,
 };
 
 /** The "server is now joinable" log-marker regex for a game. */
@@ -1080,7 +1082,8 @@ export class ServersService implements OnApplicationBootstrap {
       game === Game.SOTF ||
       game === Game.SATISFACTORY ||
       game === Game.LIF ||
-      game === Game.ATS
+      game === Game.ATS ||
+      game === Game.ETS2
     )
       return;
     if (!containerId || game === Game.CONAN || game === Game.MINECRAFT || game === Game.ZOMBOID) {
@@ -1315,11 +1318,11 @@ export class ServersService implements OnApplicationBootstrap {
       return;
     }
 
-    // ATS: settings live in server_config.sii inside the game's save dir. The
+    // ATS/ETS2: settings live in server_config.sii inside the game's save dir. The
     // ich777 image seeds it (with the bundled server_packages world export) on
     // FIRST boot only — so it can't be pre-written; once present, patch our
     // lobby name/password/slots/ports + catalog values before every start.
-    if (game === Game.ATS) {
+    if (game === Game.ATS || game === Game.ETS2) {
       const file = join(
         env.DATA_DIR,
         "instances",
@@ -1327,7 +1330,7 @@ export class ServersService implements OnApplicationBootstrap {
         "serverfiles",
         ".local",
         "share",
-        "American Truck Simulator",
+        game === Game.ATS ? "American Truck Simulator" : "Euro Truck Simulator 2",
         "server_config.sii",
       );
       const sii = await readFile(file, "utf8").catch(() => null);
@@ -1338,7 +1341,7 @@ export class ServersService implements OnApplicationBootstrap {
           maxPlayers: server.maxPlayers,
           gamePort: server.gamePort,
           queryPort: server.queryPort,
-          catalog: this.catalog.getCatalog(Game.ATS),
+          catalog: this.catalog.getCatalog(game),
           config: JSON.parse(server.configJson) as ServerConfigValues,
         });
         if (patched !== sii) await writeFile(file, patched, "utf8");

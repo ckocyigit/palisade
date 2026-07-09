@@ -91,6 +91,8 @@ export const LocalPaths = {
         // server_config.sii + the server_packages world export + convoy saves all
         // live in the game's XDG data dir inside the serverfiles bind.
         return ["serverfiles/.local/share/American Truck Simulator"];
+      case Game.ETS2:
+        return ["serverfiles/.local/share/Euro Truck Simulator 2"];
       default:
         return ["ShooterGame/Saved"]; // ASA (POK)
     }

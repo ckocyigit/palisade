@@ -915,6 +915,29 @@ describe("buildContainerSpec + patchAtsServerConfig (ATS / ich777)", () => {
     expect(binds.some((b) => b.endsWith(":/serverdata/serverfiles"))).toBe(true);
   });
 
+  it("ETS2 rides the same builder with its own image/app id/port block", async () => {
+    const { buildContainerSpec } = await import("./runtime-spec");
+    const { ETS2_CATALOG } = await import("../catalog/ats.catalog");
+    const spec = buildContainerSpec({
+      serverId: "srv1",
+      game: Game.ETS2,
+      map: "ETS2World",
+      sessionName: "Euro Convoy",
+      ports: { game: 27018, rawSocket: 27020, query: 27019, rcon: 0 },
+      maxPlayers: 8,
+      adminPassword: "",
+      serverPassword: null,
+      modIds: [],
+      cluster: null,
+      config: { values: {} },
+      catalog: ETS2_CATALOG,
+    });
+    expect(spec.Image).toBe("ghcr.io/ich777/steamcmd:ets2");
+    expect(envOf(spec)).toContain("GAME_ID=1948160");
+    expect(spec.HostConfig?.PortBindings?.["27018/udp"]).toEqual([{ HostPort: "27018" }]);
+    expect(spec.HostConfig?.PortBindings?.["27019/udp"]).toEqual([{ HostPort: "27019" }]);
+  });
+
   const SAMPLE = `SiiNunit
 {
 server_config : _nameless.1ad.e2c8.f150 {

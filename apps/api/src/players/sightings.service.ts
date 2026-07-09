@@ -59,6 +59,7 @@ const ACTIONS_BY_GAME: Record<Game, PlayerAction[]> = {
   [Game.SATISFACTORY]: [], // no console; management is in-game via the claimed admin password
   [Game.LIF]: [], // no console; admin is the in-game GM password
   [Game.ATS]: [], // no console; Convoy sessions have no server-side moderation
+  [Game.ETS2]: [],
 };
 
 const CAPTURE_NOTES: Partial<Record<Game, string>> = {

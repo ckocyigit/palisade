@@ -82,7 +82,7 @@ export function buildContainerSpec(input: RuntimeSpecInput): Docker.ContainerCre
   if (input.game === Game.SOTF) return buildSotfSpec(input);
   if (input.game === Game.SATISFACTORY) return buildSatisfactorySpec(input);
   if (input.game === Game.LIF) return buildLifSpec(input);
-  if (input.game === Game.ATS) return buildAtsSpec(input);
+  if (input.game === Game.ATS || input.game === Game.ETS2) return buildAtsSpec(input);
   return buildAseSpec(input);
 }
 
@@ -1442,12 +1442,12 @@ function buildLifSpec(input: RuntimeSpecInput): Docker.ContainerCreateOptions {
 const STEAM_APP_ID_LIF = 320850;
 
 /**
- * American Truck Simulator — same ich777 SteamCMD wrapper as LiF:YO, but the
- * dedicated server is NATIVE Linux (bin/linux_x64/amtrucks_server) and the image
- * seeds a default server_packages world export + server_config.sii into the save
- * dir on first boot (normally the awkward part: exporting them from a game
- * client). All settings live in server_config.sii, patched by
- * patchAtsServerConfig before each start. NO RCON.
+ * American Truck Simulator / Euro Truck Simulator 2 — same ich777 SteamCMD wrapper
+ * as LiF:YO, but the dedicated servers are NATIVE Linux and the images seed a
+ * default server_packages world export + server_config.sii into the save dir on
+ * first boot (normally the awkward part: exporting them from a game client). All
+ * settings live in server_config.sii, patched by patchAtsServerConfig before each
+ * start. NO RCON. The two games differ only in app id, image tag, and save dir.
  */
 function buildAtsSpec(input: RuntimeSpecInput): Docker.ContainerCreateOptions {
   const env = loadEnv();
@@ -1455,7 +1455,7 @@ function buildAtsSpec(input: RuntimeSpecInput): Docker.ContainerCreateOptions {
 
   const atsEnv = [
     `TZ=${input.timezone || env.TZ}`,
-    `GAME_ID=2239530`,
+    `GAME_ID=${input.game === Game.ATS ? 2239530 : 1948160}`,
     `GAME_PARAMS=`,
     `UID=${env.PUID}`,
     `GID=${env.PGID}`,
@@ -1472,7 +1472,7 @@ function buildAtsSpec(input: RuntimeSpecInput): Docker.ContainerCreateOptions {
   const hostNet = env.GAME_HOST_NETWORK;
   return {
     name: containerName(input.serverId, input.game, input.sessionName),
-    Image: IMAGES[Game.ATS],
+    Image: IMAGES[input.game],
     Hostname: containerName(input.serverId, input.game, input.sessionName),
     Env: atsEnv,
     Labels: serverLabels(input, env.PUBLIC_BASE_URL),

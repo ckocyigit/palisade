@@ -62,6 +62,9 @@ export const IMAGES: Record<Game, string> = {
   // (normally exported from a game client) + server_config.sii into the save dir on
   // first boot. The manager patches server_config.sii before later starts. NO RCON.
   [Game.ATS]: "ghcr.io/ich777/steamcmd:ats",
+  // Same wrapper, ETS2 flavour — identical contract to ATS (app 1948160, save dir
+  // "Euro Truck Simulator 2", native eurotrucks2_server binary).
+  [Game.ETS2]: "ghcr.io/ich777/steamcmd:ets2",
 };
 
 /** POK keeps all instance data (install + saves + config) under this path. */
@@ -129,9 +132,10 @@ export const SATISFACTORY_CONFIG_DIR = "/config";
 export const LIF_STEAMCMD_DIR = "/serverdata/steamcmd";
 export const LIF_SERVERFILES_DIR = "/serverdata/serverfiles";
 
-/** ATS (ich777, same wrapper layout as LiF): SteamCMD + serverfiles. The config +
- *  server_packages + saves live at serverfiles/.local/share/American Truck Simulator. */
+/** ATS/ETS2 (ich777, same wrapper layout as LiF): SteamCMD + serverfiles. The config +
+ *  server_packages + saves live under the game's XDG data dir inside serverfiles. */
 export const ATS_SAVE_SUBDIR = ".local/share/American Truck Simulator";
+export const ETS2_SAVE_SUBDIR = ".local/share/Euro Truck Simulator 2";
 
 /**
  * The uid/gid each image runs the server as. Neither chowns its mounts fully
@@ -155,6 +159,7 @@ export const SERVER_UID: Record<Game, number> = {
   [Game.SATISFACTORY]: 1000, // wolveix runs the game as PUID/PGID (default 1000)
   [Game.LIF]: 99, // ich777's default nobody/users, remapped via UID/GID env (we pass PUID/PGID)
   [Game.ATS]: 99, // same ich777 wrapper convention
+  [Game.ETS2]: 99,
 };
 export const SERVER_GID: Record<Game, number> = {
   [Game.ASA]: 7777,
@@ -173,4 +178,5 @@ export const SERVER_GID: Record<Game, number> = {
   [Game.SATISFACTORY]: 1000,
   [Game.LIF]: 100,
   [Game.ATS]: 100,
+  [Game.ETS2]: 100,
 };

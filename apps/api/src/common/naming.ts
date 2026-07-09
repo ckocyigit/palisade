@@ -22,6 +22,7 @@ const CONTAINER_PREFIX: Record<Game, string> = {
   [Game.SATISFACTORY]: "satisfactory",
   [Game.LIF]: "lif",
   [Game.ATS]: "ats",
+  [Game.ETS2]: "ets2",
 };
 
 function slug(s: string): string {

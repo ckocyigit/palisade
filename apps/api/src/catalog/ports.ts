@@ -121,6 +121,13 @@ export const LIF_PORTS: PortSet = { game: 28000, rawSocket: 28001, query: 28002,
 export const ATS_PORTS: PortSet = { game: 27015, rawSocket: 27017, query: 27016, rcon: 0 };
 
 /**
+ * ETS2: same engine as ATS but on a SHIFTED block (connection 27018 + query 27019,
+ * patched into server_config.sii) so both truck sims — each tiny — can run at the
+ * same time without tripping the port-conflict guard.
+ */
+export const ETS2_PORTS: PortSet = { game: 27018, rawSocket: 27020, query: 27019, rcon: 0 };
+
+/**
  * Every host port a server binds (skipping unused 0 slots — e.g. rcon on no-RCON
  * games). Valheim also binds its HTTP status endpoint on game + 3, and Minecraft's
  * query column mirrors the game port (the set dedupes it). Used by the start-time
@@ -210,6 +217,7 @@ export function forwardSpec(game: Game, ports: PortSet): ForwardPort[] {
         { port: ports.query, proto: "udp", label: "query (server browser)" },
       ];
     case Game.ATS:
+    case Game.ETS2:
       return [
         { port: ports.game, proto: "udp", label: "connection" },
         { port: ports.query, proto: "udp", label: "query (server browser)" },
@@ -238,5 +246,6 @@ export function portsFor(game: Game): PortSet {
   if (game === Game.SATISFACTORY) return SATISFACTORY_PORTS;
   if (game === Game.LIF) return LIF_PORTS;
   if (game === Game.ATS) return ATS_PORTS;
+  if (game === Game.ETS2) return ETS2_PORTS;
   return FIXED_PORTS;
 }

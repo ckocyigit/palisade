@@ -32,6 +32,8 @@ export enum Game {
   LIF = "LIF",
   /** American Truck Simulator — ich777 image (native Linux); we patch server_config.sii; NO RCON. */
   ATS = "ATS",
+  /** Euro Truck Simulator 2 — ich777 image (native Linux, ATS twin); we patch server_config.sii; NO RCON. */
+  ETS2 = "ETS2",
 }
 
 /** Friendly game names for the UI. */
@@ -52,6 +54,7 @@ export const GAME_LABELS: Record<Game, string> = {
   [Game.SATISFACTORY]: "Satisfactory",
   [Game.LIF]: "Life is Feudal: Your Own",
   [Game.ATS]: "American Truck Simulator",
+  [Game.ETS2]: "Euro Truck Simulator 2",
 };
 
 /** SteamCMD app IDs for the dedicated server (anonymous login). */
@@ -86,6 +89,8 @@ export const STEAM_APP_ID: Record<Game, number> = {
   [Game.LIF]: 320850,
   // American Truck Simulator dedicated server (the ich777 image installs it via SteamCMD).
   [Game.ATS]: 2239530,
+  // Euro Truck Simulator 2 dedicated server (the ich777 image installs it via SteamCMD).
+  [Game.ETS2]: 1948160,
 };
 
 /** Steam Workshop "consumer" app ids for mod downloads (ARK: Survival Evolved /
@@ -129,6 +134,7 @@ export const GAME_ICONS: Record<Game, string> = {
   [Game.SATISFACTORY]: "https://cdn.cloudflare.steamstatic.com/steam/apps/526870/header.jpg",
   [Game.LIF]: "https://cdn.cloudflare.steamstatic.com/steam/apps/290080/header.jpg",
   [Game.ATS]: "https://cdn.cloudflare.steamstatic.com/steam/apps/270880/header.jpg",
+  [Game.ETS2]: "https://cdn.cloudflare.steamstatic.com/steam/apps/227300/header.jpg",
 };
 
 /** CurseForge numeric game id for ASA (used by the mod browser). */
@@ -185,6 +191,7 @@ export const RAM_ESTIMATE_MB: Record<Game, number> = {
   [Game.LIF]: 8000,
   // ATS's dedicated server is tiny — well under 2 GB even with 8 players.
   [Game.ATS]: 2000,
+  [Game.ETS2]: 2000,
 };
 
 /**
@@ -210,6 +217,7 @@ export const MAX_PLAYERS_BY_GAME: Record<Game, number> = {
   [Game.SATISFACTORY]: 16, // no hard cap; >8 needs serious hardware (default is 4)
   [Game.LIF]: 64, // world_1.xml maxPlayers hard range 1-64
   [Game.ATS]: 8, // SCS's hard cap for Convoy sessions
+  [Game.ETS2]: 8, // same SCS Convoy cap
 };
 
 /** The default player count the create form pre-fills per game (a sensible starting
@@ -231,6 +239,7 @@ export const DEFAULT_MAX_PLAYERS_BY_GAME: Record<Game, number> = {
   [Game.SATISFACTORY]: 4,
   [Game.LIF]: 16,
   [Game.ATS]: 8,
+  [Game.ETS2]: 8,
 };
 
 /** A password field on the create form: whether to show it at all, its label, an
@@ -285,6 +294,7 @@ export const ADMIN_PASSWORD_META: Record<Game, PasswordFieldMeta> = {
     help: "Unlocks in-game GM mode. NOTE: the game files (and config) install on the FIRST start, so name + passwords apply from the second start — restart once after the first boot.",
   },
   [Game.ATS]: { show: false, label: "" }, // no admin/console concept — session host moderates
+  [Game.ETS2]: { show: false, label: "" },
 };
 
 /** The join (server) password field, per game. Every game can have one, but Valheim
@@ -318,6 +328,11 @@ export const JOIN_PASSWORD_META: Record<Game, PasswordFieldMeta> = {
   [Game.SATISFACTORY]: { show: true, label: "Server password (players need it to join)" },
   [Game.LIF]: { show: true, label: "Server password (players need it to join)" },
   [Game.ATS]: {
+    show: true,
+    label: "Session password (players need it to join)",
+    help: "Applies from the second start — the config file is seeded on the first boot.",
+  },
+  [Game.ETS2]: {
     show: true,
     label: "Session password (players need it to join)",
     help: "Applies from the second start — the config file is seeded on the first boot.",
@@ -421,6 +436,9 @@ export const LIF_OFFICIAL_MAPS = ["Abella"] as const;
 /** ATS's world is fixed by the server_packages export — no map choice here. */
 export const ATS_OFFICIAL_MAPS = ["ATSWorld"] as const;
 
+/** ETS2's world is fixed by the server_packages export — no map choice here. */
+export const ETS2_OFFICIAL_MAPS = ["ETS2World"] as const;
+
 /** Friendly display names for known level names (raw level → label). */
 export const MAP_LABELS: Record<string, string> = {
   // Conan Exiles
@@ -455,6 +473,8 @@ export const MAP_LABELS: Record<string, string> = {
   Abella: "The island (3\u00d73 km)",
   // American Truck Simulator (world defined by server_packages)
   ATSWorld: "The West (base map + exported DLCs)",
+  // Euro Truck Simulator 2 (world defined by server_packages)
+  ETS2World: "Europe (base map + exported DLCs)",
   // Sons of the Forest game modes (repurposed map field)
   Normal: "Normal (survival)",
   Hard: "Hard (survival)",

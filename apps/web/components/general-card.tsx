@@ -21,6 +21,7 @@ import {
   SATISFACTORY_OFFICIAL_MAPS,
   LIF_OFFICIAL_MAPS,
   ATS_OFFICIAL_MAPS,
+  ETS2_OFFICIAL_MAPS,
   mapLabel,
   type ServerSummary,
 } from "@ark/shared";
@@ -43,6 +44,7 @@ const MAPS_FOR: Record<Game, readonly string[]> = {
   [Game.SATISFACTORY]: SATISFACTORY_OFFICIAL_MAPS,
   [Game.LIF]: LIF_OFFICIAL_MAPS,
   [Game.ATS]: ATS_OFFICIAL_MAPS,
+  [Game.ETS2]: ETS2_OFFICIAL_MAPS,
 };
 
 /**

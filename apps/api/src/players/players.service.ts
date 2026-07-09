@@ -27,6 +27,7 @@ const A2S_GAMES = new Set<Game>([
   Game.SOTF,
   Game.LIF,
   Game.ATS,
+  Game.ETS2,
 ]);
 
 /**

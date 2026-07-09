@@ -24,6 +24,7 @@ import {
   SATISFACTORY_OFFICIAL_MAPS,
   LIF_OFFICIAL_MAPS,
   ATS_OFFICIAL_MAPS,
+  ETS2_OFFICIAL_MAPS,
   GAME_LABELS,
   MAX_PLAYERS_BY_GAME,
   DEFAULT_MAX_PLAYERS_BY_GAME,
@@ -296,6 +297,7 @@ const MAPS_FOR: Record<Game, readonly string[]> = {
   [Game.SATISFACTORY]: SATISFACTORY_OFFICIAL_MAPS,
   [Game.LIF]: LIF_OFFICIAL_MAPS,
   [Game.ATS]: ATS_OFFICIAL_MAPS,
+  [Game.ETS2]: ETS2_OFFICIAL_MAPS,
 };
 
 function CreateServerForm({ onDone }: { onDone: () => void }) {

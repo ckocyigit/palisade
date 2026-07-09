@@ -63,3 +63,6 @@ const settings: SettingDef[] = [
 ];
 
 export const ATS_CATALOG: SettingsCatalog = { game: Game.ATS, version: "1", settings };
+
+/** ETS2 shares ATS's engine and the exact same server_config.sii surface. */
+export const ETS2_CATALOG: SettingsCatalog = { game: Game.ETS2, version: "1", settings };

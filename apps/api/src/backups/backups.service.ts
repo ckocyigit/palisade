@@ -292,7 +292,8 @@ export class BackupsService {
       game === Game.SOTF ||
       game === Game.SATISFACTORY ||
       game === Game.LIF ||
-      game === Game.ATS
+      game === Game.ATS ||
+      game === Game.ETS2
     ) {
       const env = loadEnv();
       return [Number(env.PUID), Number(env.PGID)];
