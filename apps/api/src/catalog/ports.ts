@@ -82,6 +82,13 @@ export const ZOMBOID_PORTS: PortSet = { game: 16261, rawSocket: 16262, query: 16
 export const ZOMBOID_STEAM_PORTS = [8766, 8767] as const;
 
 /**
+ * V Rising: game on UDP 9876, Steam query on UDP 9877 (both env-configurable).
+ * Source RCON on TCP 25575 (V Rising's default; we set it via HOST_SETTINGS_Rcon__Port).
+ * rawSocket is unused (mirrors game+1 by convention).
+ */
+export const VRISING_PORTS: PortSet = { game: 9876, rawSocket: 9878, query: 9877, rcon: 25575 };
+
+/**
  * Every host port a server binds (skipping unused 0 slots — e.g. rcon on no-RCON
  * games). Valheim also binds its HTTP status endpoint on game + 3, and Minecraft's
  * query column mirrors the game port (the set dedupes it). Used by the start-time
@@ -143,6 +150,11 @@ export function forwardSpec(game: Game, ports: PortSet): ForwardPort[] {
         { port: ZOMBOID_STEAM_PORTS[0], proto: "udp", label: "steam comms 1" },
         { port: ZOMBOID_STEAM_PORTS[1], proto: "udp", label: "steam comms 2" },
       ];
+    case Game.VRISING:
+      return [
+        { port: ports.game, proto: "udp", label: "game" },
+        { port: ports.query, proto: "udp", label: "query (server browser)" },
+      ];
     default:
       // ARK family + Conan: game + raw socket + query, all UDP.
       return [
@@ -162,5 +174,6 @@ export function portsFor(game: Game): PortSet {
   if (game === Game.SEVEN_DAYS) return SEVEN_DAYS_PORTS;
   if (game === Game.ENSHROUDED) return ENSHROUDED_PORTS;
   if (game === Game.ZOMBOID) return ZOMBOID_PORTS;
+  if (game === Game.VRISING) return VRISING_PORTS;
   return FIXED_PORTS;
 }

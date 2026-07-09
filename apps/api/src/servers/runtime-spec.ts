@@ -28,6 +28,8 @@ import {
   SEVEN_DAYS_SAVES_DIR,
   ENSHROUDED_GAME_DIR,
   ZOMBOID_DATA_DIR,
+  VRISING_SERVER_DIR,
+  VRISING_DATA_DIR,
 } from "../common/images";
 import { ZOMBOID_STEAM_PORTS } from "../catalog/ports";
 import { ARK_NETWORK, containerName } from "../common/naming";
@@ -69,6 +71,7 @@ export function buildContainerSpec(input: RuntimeSpecInput): Docker.ContainerCre
   if (input.game === Game.SEVEN_DAYS) return buildSevenDaysSpec(input);
   if (input.game === Game.ENSHROUDED) return buildEnshroudedSpec(input);
   if (input.game === Game.ZOMBOID) return buildZomboidSpec(input);
+  if (input.game === Game.VRISING) return buildVRisingSpec(input);
   return buildAseSpec(input);
 }
 
@@ -1092,6 +1095,93 @@ function buildZomboidSpec(input: RuntimeSpecInput): Docker.ContainerCreateOption
 
 /** Zomboid settings -> danixu86 env vars. Booleans become true/false; empty dropped. */
 function zomboidCatalogEnv(input: RuntimeSpecInput): string[] {
+  const out: string[] = [];
+  for (const def of input.catalog.settings) {
+    if (def.target !== SettingTarget.Env) continue;
+    const raw = input.config.values?.[def.key] ?? def.default;
+    if (raw === undefined || raw === null || raw === "") continue;
+    const val = typeof raw === "boolean" ? (raw ? "true" : "false") : String(raw);
+    out.push(`${def.emitAs ?? def.key}=${val}`);
+  }
+  return out;
+}
+
+/**
+ * V Rising: drive the trueosiris image via env vars. The image installs the game
+ * via SteamCMD into the server bind and runs it under Wine; any HOST_SETTINGS_ /
+ * GAME_SETTINGS_ prefixed env var patches the two settings JSONs in the
+ * persistentdata bind on boot (`__` = one JSON nesting level, type-validated).
+ * RCON is Source-protocol; we enable it + set the password via HOST_SETTINGS.
+ * NOTE: the current image's /start.sh ships with CRLF line endings, so the
+ * documented entrypoint override strips them before exec — drop it when upstream
+ * fixes the script (it's harmless either way).
+ */
+function buildVRisingSpec(input: RuntimeSpecInput): Docker.ContainerCreateOptions {
+  const env = loadEnv();
+  const { ports } = input;
+  const slots = Math.min(Math.max(input.maxPlayers, 1), 40);
+
+  const vrisingEnv = [
+    `TZ=${input.timezone || env.TZ}`,
+    `SERVERNAME=${input.sessionName}`,
+    `WORLDNAME=world1`,
+    `GAMEPORT=${ports.game}`, // 9876
+    `QUERYPORT=${ports.query}`, // 9877
+    `WINEDEBUG=fixme-all`, // silence Wine's fixme log spam
+    `HOST_SETTINGS_Password=${serverPassword(input)}`,
+    `HOST_SETTINGS_MaxConnectedUsers=${slots}`,
+    `HOST_SETTINGS_Rcon__Enabled=true`,
+    `HOST_SETTINGS_Rcon__Password=${input.adminPassword}`,
+    `HOST_SETTINGS_Rcon__Port=${ports.rcon}`, // 25575
+    ...vrisingCatalogEnv(input),
+  ];
+
+  const root = HostPaths.instanceRoot(input.serverId);
+  const binds = [
+    `${root}/server:${VRISING_SERVER_DIR}`, // SteamCMD game install (~2 GB)
+    `${root}/persistentdata:${VRISING_DATA_DIR}`, // saves + settings JSONs
+  ];
+
+  const hostNet = env.GAME_HOST_NETWORK;
+  return {
+    name: containerName(input.serverId, input.game, input.sessionName),
+    Image: IMAGES[Game.VRISING],
+    Hostname: containerName(input.serverId, input.game, input.sessionName),
+    // CRLF fix from the image's own README (see the function comment).
+    Entrypoint: ["/bin/bash", "-c", "sed -i 's/\\r//g' /start.sh && exec /bin/bash /start.sh"],
+    Env: vrisingEnv,
+    Labels: serverLabels(input, env.PUBLIC_BASE_URL),
+    ...(hostNet
+      ? {}
+      : {
+          ExposedPorts: {
+            [portKey(ports.game, "udp")]: {},
+            [portKey(ports.query, "udp")]: {},
+            [portKey(ports.rcon, "tcp")]: {},
+          },
+        }),
+    HostConfig: {
+      Binds: binds,
+      ...(hostNet
+        ? { NetworkMode: "host" }
+        : {
+            PortBindings: {
+              [portKey(ports.game, "udp")]: [{ HostPort: String(ports.game) }],
+              [portKey(ports.query, "udp")]: [{ HostPort: String(ports.query) }],
+              [portKey(ports.rcon, "tcp")]: [{ HostPort: String(ports.rcon) }],
+            },
+          }),
+      RestartPolicy: { Name: "no" }, // manager watchdog owns restarts
+      Memory: input.ramLimitMb ? input.ramLimitMb * 1024 * 1024 : undefined,
+      NanoCpus: input.cpuLimit ? Math.round(input.cpuLimit * 1e9) : undefined,
+    },
+    ...(hostNet ? {} : { NetworkingConfig: { EndpointsConfig: { [ARK_NETWORK]: {} } } }),
+  };
+}
+
+/** V Rising settings -> HOST_SETTINGS_/GAME_SETTINGS_ env vars. Booleans become
+ *  true/false; empty strings dropped (the image ignores unknown/absent keys). */
+function vrisingCatalogEnv(input: RuntimeSpecInput): string[] {
   const out: string[] = [];
   for (const def of input.catalog.settings) {
     if (def.target !== SettingTarget.Env) continue;

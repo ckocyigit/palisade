@@ -20,6 +20,7 @@ const QUICK_COMMANDS: Partial<Record<Game, string[]>> = {
   [Game.MINECRAFT]: ["list", "say ", "time set day", "weather clear", "whitelist list", "difficulty "],
   [Game.SEVEN_DAYS]: ["listplayers", "gettime", "settime day", "saveworld", "say "],
   [Game.ZOMBOID]: ["players", 'servermsg "', "save", "showoptions", "checkModsNeedUpdate"],
+  [Game.VRISING]: ["announce ", "announcerestart ", "help"],
 };
 
 export function RconConsole({

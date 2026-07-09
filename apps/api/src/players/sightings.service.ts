@@ -54,6 +54,7 @@ const ACTIONS_BY_GAME: Record<Game, PlayerAction[]> = {
   [Game.SEVEN_DAYS]: ["kick", "ban", "whitelist", "admin"],
   [Game.ENSHROUDED]: [], // no console + role passwords instead of per-player perms
   [Game.ZOMBOID]: ["kick", "ban", "admin"], // RCON: kickuser / banuser / setaccesslevel
+  [Game.VRISING]: [], // RCON has no player/kick/ban commands (announce/shutdown only)
 };
 
 const CAPTURE_NOTES: Partial<Record<Game, string>> = {

@@ -16,6 +16,7 @@ import {
   SEVEN_DAYS_OFFICIAL_MAPS,
   ENSHROUDED_OFFICIAL_MAPS,
   ZOMBOID_OFFICIAL_MAPS,
+  VRISING_OFFICIAL_MAPS,
   mapLabel,
   type ServerSummary,
 } from "@ark/shared";
@@ -33,6 +34,7 @@ const MAPS_FOR: Record<Game, readonly string[]> = {
   [Game.SEVEN_DAYS]: SEVEN_DAYS_OFFICIAL_MAPS,
   [Game.ENSHROUDED]: ENSHROUDED_OFFICIAL_MAPS,
   [Game.ZOMBOID]: ZOMBOID_OFFICIAL_MAPS,
+  [Game.VRISING]: VRISING_OFFICIAL_MAPS,
 };
 
 /**

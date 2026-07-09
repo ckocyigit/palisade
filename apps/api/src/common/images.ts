@@ -40,6 +40,10 @@ export const IMAGES: Record<Game, string> = {
   // image; only the Zomboid data dir persists). Env-driven; Source RCON; Workshop
   // mods via WORKSHOP_IDS + MOD_IDS. B42 = the :latest-unstable tag when it lands.
   [Game.ZOMBOID]: "danixu86/project-zomboid-dedicated-server:latest",
+  // trueosiris/vrising — installs the V Rising Windows server via SteamCMD and runs
+  // it under Wine. Settings via generic HOST_SETTINGS_*/GAME_SETTINGS_* env vars
+  // that patch the two settings JSONs. Source RCON (we enable it via env).
+  [Game.VRISING]: "trueosiris/vrising:latest",
 };
 
 /** POK keeps all instance data (install + saves + config) under this path. */
@@ -89,6 +93,11 @@ export const ENSHROUDED_GAME_DIR = "/opt/enshrouded";
  *  under the Zomboid home dir; the game install itself is baked into the image. */
 export const ZOMBOID_DATA_DIR = "/home/steam/Zomboid";
 
+/** V Rising (trueosiris) splits data: the SteamCMD game install vs the world saves +
+ *  settings JSONs. Bound separately so backups target the small persistentdata dir. */
+export const VRISING_SERVER_DIR = "/mnt/vrising/server";
+export const VRISING_DATA_DIR = "/mnt/vrising/persistentdata";
+
 /**
  * The uid/gid each image runs the server as. Neither chowns its mounts fully
  * (POK never does; hermsi only chowns the volume root), so the manager makes the
@@ -106,6 +115,7 @@ export const SERVER_UID: Record<Game, number> = {
   [Game.SEVEN_DAYS]: 1000, // LinuxGSM's sdtdserver user; we pass env.PUID/PGID + chown
   [Game.ENSHROUDED]: 4711, // mornedhels default (overridable via PUID/PGID); env-driven, no INI injection
   [Game.ZOMBOID]: 1000, // danixu86 runs as the "steam" user
+  [Game.VRISING]: 0, // trueosiris runs as root (no PUID/PGID support)
 };
 export const SERVER_GID: Record<Game, number> = {
   [Game.ASA]: 7777,
@@ -119,4 +129,5 @@ export const SERVER_GID: Record<Game, number> = {
   [Game.SEVEN_DAYS]: 1000,
   [Game.ENSHROUDED]: 4711,
   [Game.ZOMBOID]: 1000,
+  [Game.VRISING]: 0,
 };

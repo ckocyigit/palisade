@@ -22,6 +22,8 @@ export enum Game {
   ENSHROUDED = "ENSHROUDED",
   /** Project Zomboid — danixu86 image (native Java server); RCON + Steam Workshop mods. */
   ZOMBOID = "ZOMBOID",
+  /** V Rising — trueosiris image (SteamCMD under Wine), env-driven JSON settings; RCON. */
+  VRISING = "VRISING",
 }
 
 /** Friendly game names for the UI. */
@@ -37,6 +39,7 @@ export const GAME_LABELS: Record<Game, string> = {
   [Game.SEVEN_DAYS]: "7 Days to Die",
   [Game.ENSHROUDED]: "Enshrouded",
   [Game.ZOMBOID]: "Project Zomboid",
+  [Game.VRISING]: "V Rising",
 };
 
 /** SteamCMD app IDs for the dedicated server (anonymous login). */
@@ -61,6 +64,8 @@ export const STEAM_APP_ID: Record<Game, number> = {
   [Game.ENSHROUDED]: 2278520,
   // Project Zomboid dedicated server (baked into the danixu86 image at build time).
   [Game.ZOMBOID]: 380870,
+  // V Rising dedicated server (the trueosiris image installs it via SteamCMD).
+  [Game.VRISING]: 1829350,
 };
 
 /** Steam Workshop "consumer" app ids for mod downloads (ARK: Survival Evolved /
@@ -99,6 +104,7 @@ export const GAME_ICONS: Record<Game, string> = {
   [Game.SEVEN_DAYS]: "https://cdn.cloudflare.steamstatic.com/steam/apps/251570/header.jpg",
   [Game.ENSHROUDED]: "https://cdn.cloudflare.steamstatic.com/steam/apps/1203620/header.jpg",
   [Game.ZOMBOID]: "https://cdn.cloudflare.steamstatic.com/steam/apps/108600/header.jpg",
+  [Game.VRISING]: "https://cdn.cloudflare.steamstatic.com/steam/apps/1604030/header.jpg",
 };
 
 /** CurseForge numeric game id for ASA (used by the mod browser). */
@@ -145,6 +151,8 @@ export const RAM_ESTIMATE_MB: Record<Game, number> = {
   [Game.ENSHROUDED]: 8000,
   // Project Zomboid runs a JVM — ~2-4 GB vanilla, more with mods.
   [Game.ZOMBOID]: 4000,
+  // V Rising under Wine — Stunlock recommend ~6 GB for a populated server.
+  [Game.VRISING]: 6000,
 };
 
 /**
@@ -165,6 +173,7 @@ export const MAX_PLAYERS_BY_GAME: Record<Game, number> = {
   [Game.SEVEN_DAYS]: 64,
   [Game.ENSHROUDED]: 16, // SERVER_SLOT_COUNT hard range 1–16
   [Game.ZOMBOID]: 64, // no hard cap; 32+ needs serious JVM memory
+  [Game.VRISING]: 40, // Stunlock's supported ceiling (MaxConnectedUsers)
 };
 
 /** The default player count the create form pre-fills per game (a sensible starting
@@ -181,6 +190,7 @@ export const DEFAULT_MAX_PLAYERS_BY_GAME: Record<Game, number> = {
   [Game.SEVEN_DAYS]: 8,
   [Game.ENSHROUDED]: 16,
   [Game.ZOMBOID]: 16,
+  [Game.VRISING]: 10,
 };
 
 /** A password field on the create form: whether to show it at all, its label, an
@@ -222,6 +232,7 @@ export const ADMIN_PASSWORD_META: Record<Game, PasswordFieldMeta> = {
     required: true,
     minLength: 5,
   },
+  [Game.VRISING]: { show: true, label: "RCON password (enables the console)" },
 };
 
 /** The join (server) password field, per game. Every game can have one, but Valheim
@@ -250,6 +261,7 @@ export const JOIN_PASSWORD_META: Record<Game, PasswordFieldMeta> = {
     minLength: 5,
   },
   [Game.ZOMBOID]: { show: true, label: "Server password (players need it to join)" },
+  [Game.VRISING]: { show: true, label: "Server password (players need it to join)" },
 };
 
 /** Default port offsets within a per-server allocation block. */
@@ -333,6 +345,9 @@ export const ENSHROUDED_OFFICIAL_MAPS = ["Enshrouded"] as const;
 /** Project Zomboid: one huge fixed world (Knox Country). */
 export const ZOMBOID_OFFICIAL_MAPS = ["Muldraugh, KY"] as const;
 
+/** V Rising has a single fixed world (Vardoran) — no map choice. */
+export const VRISING_OFFICIAL_MAPS = ["Vardoran"] as const;
+
 /** Friendly display names for known level names (raw level → label). */
 export const MAP_LABELS: Record<string, string> = {
   // Conan Exiles
@@ -359,6 +374,8 @@ export const MAP_LABELS: Record<string, string> = {
   Enshrouded: "Procedural world",
   // Project Zomboid
   "Muldraugh, KY": "Knox Country (full map)",
+  // V Rising
+  Vardoran: "Vardoran",
   // ASA (World Partition — *_WP)
   TheIsland_WP: "The Island",
   TheCenter_WP: "The Center",

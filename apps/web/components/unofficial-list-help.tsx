@@ -40,6 +40,7 @@ export function UnofficialListHelp({
   const sdtd = game === Game.SEVEN_DAYS;
   const enshrouded = game === Game.ENSHROUDED;
   const zomboid = game === Game.ZOMBOID;
+  const vrising = game === Game.VRISING;
   const passwordHint = hasJoinPassword
     ? "your server has a join password"
     : "ON only if you set a join password";
@@ -56,7 +57,7 @@ export function UnofficialListHelp({
           <Search className="h-3.5 w-3.5" />
           {minecraft || bedrock
             ? "Add it to your Minecraft server list"
-            : conan || palworld || icarus || valheim || sdtd || enshrouded || zomboid
+            : conan || palworld || icarus || valheim || sdtd || enshrouded || zomboid || vrising
               ? "Find it in the in-game server browser"
               : "Find it on the in-game Unofficial list"}
         </span>
@@ -78,6 +79,24 @@ export function UnofficialListHelp({
             <p className="pt-1 leading-snug text-slate-400">
               Search the name <span className="font-mono text-slate-200">{serverName}</span>, or use{" "}
               <span className="text-slate-200">Connect to Server</span> with the address shown above.
+            </p>
+          </div>
+        ) : vrising ? (
+          <div className="space-y-1.5 border-t border-ark-border px-2.5 py-2 text-xs">
+            <p className="text-slate-400">
+              In <span className="text-slate-200">Play → Online Play</span>:
+            </p>
+            <FilterRow
+              state="on"
+              label="Server list — search by name (only if 'List on Steam/EOS' is enabled)"
+              hint="both listing settings are off by default"
+            />
+            <FilterRow state={hasJoinPassword ? "on" : "off"} label="Password prompt on join" hint={passwordHint} />
+            <p className="pt-1 leading-snug text-slate-400">
+              Most players use <span className="text-slate-200">Direct Connect</span> with the address shown
+              above. The name <span className="font-mono text-slate-200">{serverName}</span> appears in the
+              list only when a listing setting is on. Note: joining a passworded server via the Steam friends
+              flow is flaky — use the in-game list or Direct Connect.
             </p>
           </div>
         ) : zomboid ? (

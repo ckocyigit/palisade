@@ -70,6 +70,10 @@ export const LocalPaths = {
         // The Zomboid data bind: world saves, the server ini/sandbox configs, and the
         // player-accounts database. (Workshop mod downloads + logs are skipped.)
         return ["data/Saves", "data/Server", "data/db"];
+      case Game.VRISING:
+        // The persistentdata bind: world saves (Saves/) + the two settings JSONs
+        // (Settings/). The ~2 GB game install lives in the separate server bind.
+        return ["persistentdata"];
       default:
         return ["ShooterGame/Saved"]; // ASA (POK)
     }

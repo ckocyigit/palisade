@@ -115,8 +115,11 @@ export const READY_RE_BY_GAME: Record<Game, RegExp> = {
   // (no RCON to lean on). PROVISIONAL — confirm against a real boot.
   [Game.ENSHROUDED]: /'HostOnline' \(up\)/i,
   // Project Zomboid prints "SERVER STARTED" once the world is loaded + joinable.
-  // PROVISIONAL — confirm against a real boot.
+  // CONFIRMED live: the exact line is "*** SERVER STARTED ****".
   [Game.ZOMBOID]: /SERVER STARTED/i,
+  // V Rising logs this once the server registers with Steam and is joinable.
+  // PROVISIONAL — confirm against a real boot.
+  [Game.VRISING]: /Server connected to Steam successfully/i,
 };
 
 /** The "server is now joinable" log-marker regex for a game. */
@@ -1041,12 +1044,15 @@ export class ServersService implements OnApplicationBootstrap {
     // RCON at all, and 7DTD's console is telnet (not wired here) — they autosave and
     // flush on the container's graceful shutdown, so there's nothing to issue; just
     // return and let SIGTERM handle it.
+    // V Rising's RCON has no save command either — it autosaves and flushes on the
+    // container's graceful shutdown.
     if (
       game === Game.ICARUS ||
       game === Game.BEDROCK ||
       game === Game.VALHEIM ||
       game === Game.SEVEN_DAYS ||
-      game === Game.ENSHROUDED
+      game === Game.ENSHROUDED ||
+      game === Game.VRISING
     )
       return;
     if (!containerId || game === Game.CONAN || game === Game.MINECRAFT || game === Game.ZOMBOID) {
@@ -1188,14 +1194,15 @@ export class ServersService implements OnApplicationBootstrap {
     const env = loadEnv();
     const game = server.game as Game;
     // Env-driven images build their own config (Minecraft/Bedrock → server.properties,
-    // Icarus → ServerSettings.ini, Valheim → launch args, Enshrouded → enshrouded_server.json)
-    // — none have ARK-style INI files for us to render. Nothing to write.
+    // Icarus → ServerSettings.ini, Valheim → launch args, Enshrouded → enshrouded_server.json,
+    // V Rising → HOST/GAME_SETTINGS env patching its JSONs) — nothing to render.
     if (
       game === Game.MINECRAFT ||
       game === Game.ICARUS ||
       game === Game.BEDROCK ||
       game === Game.VALHEIM ||
-      game === Game.ENSHROUDED
+      game === Game.ENSHROUDED ||
+      game === Game.VRISING
     )
       return;
 

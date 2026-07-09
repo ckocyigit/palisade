@@ -17,6 +17,7 @@ const CONTAINER_PREFIX: Record<Game, string> = {
   [Game.SEVEN_DAYS]: "7dtd",
   [Game.ENSHROUDED]: "enshrouded",
   [Game.ZOMBOID]: "zomboid",
+  [Game.VRISING]: "vrising",
 };
 
 function slug(s: string): string {

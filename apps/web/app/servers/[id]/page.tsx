@@ -167,7 +167,9 @@ export default function ServerDetailPage({ params }: { params: Promise<{ id: str
           ? new Set<Tab>(["Console"]) // no RCON, but a Thunderstore mod browser
           : server.game === Game.ENSHROUDED
             ? new Set<Tab>(["Console", "Mods"]) // no RCON, no mod support
-            : new Set<Tab>();
+            : server.game === Game.VRISING
+              ? new Set<Tab>(["Mods"]) // RCON console, but no mod support
+              : new Set<Tab>();
   const visibleTabs = TABS.filter((t) => !hiddenTabs.has(t));
 
   return (
@@ -442,9 +444,10 @@ function Overview({ server, onChanged }: { server: ServerSummary; onChanged: () 
   const isSdtd = server.game === Game.SEVEN_DAYS;
   const isEnshrouded = server.game === Game.ENSHROUDED;
   const isZomboid = server.game === Game.ZOMBOID;
-  const noQuery = isMc || isBedrock || isSdtd || isZomboid; // Valheim + Enshrouded have a real query port; Zomboid's mirrors the game port
+  const isVRising = server.game === Game.VRISING;
+  const noQuery = isMc || isBedrock || isSdtd || isZomboid; // Valheim/Enshrouded/V Rising have a real query port; Zomboid's mirrors the game port
   const noRcon = isIcarus || isBedrock || isValheim || isSdtd || isEnshrouded; // 7DTD's console is telnet
-  const noMods = isIcarus || isBedrock || isValheim || isSdtd || isEnshrouded;
+  const noMods = isIcarus || isBedrock || isValheim || isSdtd || isEnshrouded || isVRising;
   const row = (k: string, v: string): [string, string] => [k, v];
   const rows: [string, string][] = [
     row("Game", server.game),

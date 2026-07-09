@@ -132,6 +132,7 @@ export class RconService {
     if (game === Game.MINECRAFT) return this.exec(serverId, `say ${message}`);
     if (game === Game.SEVEN_DAYS) return this.exec(serverId, `say "${message}"`);
     if (game === Game.ZOMBOID) return this.exec(serverId, `servermsg "${message}"`);
+    if (game === Game.VRISING) return this.exec(serverId, `announce ${message}`);
     return this.exec(serverId, `ServerChat ${message}`);
   }
 
@@ -144,6 +145,8 @@ export class RconService {
     if (game === Game.MINECRAFT) return this.exec(serverId, "save-all");
     if (game === Game.SEVEN_DAYS) return this.exec(serverId, "saveworld");
     if (game === Game.ZOMBOID) return this.exec(serverId, "save");
+    if (game === Game.VRISING)
+      return "V Rising autosaves on an interval and flushes on shutdown — no manual save command.";
     return this.exec(serverId, "SaveWorld");
   }
 

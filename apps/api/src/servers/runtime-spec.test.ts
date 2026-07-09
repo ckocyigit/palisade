@@ -616,6 +616,84 @@ describe("buildContainerSpec (Project Zomboid / danixu86)", () => {
   });
 });
 
+async function buildVRising(config: ServerConfigValues) {
+  const { buildContainerSpec } = await import("./runtime-spec");
+  const { VRISING_CATALOG } = await import("../catalog/vrising.catalog");
+  return buildContainerSpec({
+    serverId: "srv1",
+    game: Game.VRISING,
+    map: "Vardoran",
+    sessionName: "Castle Night",
+    ports: { game: 9876, rawSocket: 9878, query: 9877, rcon: 25575 },
+    maxPlayers: 10,
+    adminPassword: "rconpw",
+    serverPassword: "hunter2",
+    modIds: [],
+    cluster: null,
+    config,
+    catalog: VRISING_CATALOG,
+  });
+}
+
+describe("buildContainerSpec (V Rising / trueosiris)", () => {
+  it("maps to the trueosiris env contract (2 UDP ports + RCON tcp, CRLF entrypoint fix)", async () => {
+    const spec = await buildVRising({ values: {} });
+    expect(spec.Image).toBe("trueosiris/vrising:latest");
+    const env = envOf(spec);
+    expect(env).toContain("SERVERNAME=Castle Night");
+    expect(env).toContain("GAMEPORT=9876");
+    expect(env).toContain("QUERYPORT=9877");
+    expect(env).toContain("HOST_SETTINGS_Password=hunter2");
+    expect(env).toContain("HOST_SETTINGS_MaxConnectedUsers=10");
+    expect(env).toContain("HOST_SETTINGS_Rcon__Enabled=true");
+    expect(env).toContain("HOST_SETTINGS_Rcon__Password=rconpw");
+    expect(env).toContain("HOST_SETTINGS_Rcon__Port=25575");
+    // The image's start.sh ships with CRLF endings — the entrypoint strips them.
+    expect(spec.Entrypoint?.[2]).toContain("sed -i 's/\\r//g' /start.sh");
+    expect(spec.HostConfig?.PortBindings?.["9876/udp"]).toEqual([{ HostPort: "9876" }]);
+    expect(spec.HostConfig?.PortBindings?.["9877/udp"]).toEqual([{ HostPort: "9877" }]);
+    expect(spec.HostConfig?.PortBindings?.["25575/tcp"]).toEqual([{ HostPort: "25575" }]);
+    const binds = spec.HostConfig?.Binds ?? [];
+    expect(binds.some((b) => b.endsWith(":/mnt/vrising/server"))).toBe(true);
+    expect(binds.some((b) => b.endsWith(":/mnt/vrising/persistentdata"))).toBe(true);
+  });
+
+  it("passes catalog settings through (bools as true/false, nested __ keys intact)", async () => {
+    const env = envOf(
+      await buildVRising({
+        values: {
+          GAME_SETTINGS_GameModeType: "PvE",
+          HOST_SETTINGS_ListOnSteam: true,
+          GAME_SETTINGS_UnitStatModifiers_Global__PowerModifier: 1.5,
+        },
+      }),
+    );
+    expect(env).toContain("GAME_SETTINGS_GameModeType=PvE");
+    expect(env).toContain("HOST_SETTINGS_ListOnSteam=true");
+    expect(env).toContain("GAME_SETTINGS_UnitStatModifiers_Global__PowerModifier=1.5");
+  });
+
+  it("caps MaxConnectedUsers at V Rising's 40", async () => {
+    const { buildContainerSpec } = await import("./runtime-spec");
+    const { VRISING_CATALOG } = await import("../catalog/vrising.catalog");
+    const spec = buildContainerSpec({
+      serverId: "srv1",
+      game: Game.VRISING,
+      map: "Vardoran",
+      sessionName: "Big",
+      ports: { game: 9876, rawSocket: 9878, query: 9877, rcon: 25575 },
+      maxPlayers: 100,
+      adminPassword: "rconpw",
+      serverPassword: null,
+      modIds: [],
+      cluster: null,
+      config: { values: {} },
+      catalog: VRISING_CATALOG,
+    });
+    expect(envOf(spec)).toContain("HOST_SETTINGS_MaxConnectedUsers=40");
+  });
+});
+
 describe("parsePzModIds", () => {
   it("parses 'Mod ID:' lines from a Workshop description (deduped, in order)", async () => {
     const { parsePzModIds } = await import("../mods/mods.service");

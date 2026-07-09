@@ -21,6 +21,7 @@ const A2S_GAMES = new Set<Game>([
   Game.ICARUS,
   Game.SEVEN_DAYS,
   Game.ENSHROUDED,
+  Game.VRISING,
 ]);
 
 /**
