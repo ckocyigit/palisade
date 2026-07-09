@@ -771,6 +771,47 @@ describe("buildContainerSpec + renderSotfConfig (Sons of the Forest / jammsen)",
   });
 });
 
+describe("buildContainerSpec (Satisfactory / wolveix)", () => {
+  async function buildSatisfactory(config: ServerConfigValues) {
+    const { buildContainerSpec } = await import("./runtime-spec");
+    const { SATISFACTORY_CATALOG } = await import("../catalog/satisfactory.catalog");
+    return buildContainerSpec({
+      serverId: "srv1",
+      game: Game.SATISFACTORY,
+      map: "Satisfactory",
+      sessionName: "Ficsit Inc",
+      ports: { game: 7777, rawSocket: 8888, query: 7777, rcon: 0 },
+      maxPlayers: 4,
+      adminPassword: "adminpw",
+      serverPassword: null,
+      modIds: [],
+      cluster: null,
+      config,
+      catalog: SATISFACTORY_CATALOG,
+    });
+  }
+
+  it("maps to the wolveix env contract (7777 udp+tcp, 8888 tcp, /config bind)", async () => {
+    const spec = await buildSatisfactory({ values: {} });
+    expect(spec.Image).toBe("wolveix/satisfactory-server:latest");
+    const env = envOf(spec);
+    expect(env).toContain("MAXPLAYERS=4");
+    expect(env).toContain("SERVERGAMEPORT=7777");
+    expect(env).toContain("SERVERMESSAGINGPORT=8888");
+    expect(spec.HostConfig?.PortBindings?.["7777/udp"]).toEqual([{ HostPort: "7777" }]);
+    expect(spec.HostConfig?.PortBindings?.["7777/tcp"]).toEqual([{ HostPort: "7777" }]);
+    expect(spec.HostConfig?.PortBindings?.["8888/tcp"]).toEqual([{ HostPort: "8888" }]);
+    expect((spec.HostConfig?.Binds ?? []).some((b) => b.endsWith(":/config"))).toBe(true);
+  });
+
+  it("passes catalog settings through (bools as true/false)", async () => {
+    const env = envOf(await buildSatisfactory({ values: { STEAMBETA: true, MAXTICKRATE: 60 } }));
+    expect(env).toContain("STEAMBETA=true");
+    expect(env).toContain("MAXTICKRATE=60");
+    expect(env).toContain("AUTOSAVENUM=5"); // catalog default
+  });
+});
+
 describe("parsePzModIds", () => {
   it("parses 'Mod ID:' lines from a Workshop description (deduped, in order)", async () => {
     const { parsePzModIds } = await import("../mods/mods.service");

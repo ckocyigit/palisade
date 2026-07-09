@@ -97,6 +97,15 @@ export const VRISING_PORTS: PortSet = { game: 9876, rawSocket: 9878, query: 9877
 export const SOTF_PORTS: PortSet = { game: 8766, rawSocket: 9700, query: 27016, rcon: 0 };
 
 /**
+ * Satisfactory: ONE game port 7777 carrying UDP game traffic AND the TCP HTTPS
+ * server API, plus the reliable-messaging port 8888 TCP (carried in the rawSocket
+ * slot). No RCON (rcon 0 — management is the HTTPS API); query mirrors the game
+ * port. NOTE: 7777 overlaps the ARK-family block — the start-time conflict guard
+ * prevents running both at once.
+ */
+export const SATISFACTORY_PORTS: PortSet = { game: 7777, rawSocket: 8888, query: 7777, rcon: 0 };
+
+/**
  * Every host port a server binds (skipping unused 0 slots — e.g. rcon on no-RCON
  * games). Valheim also binds its HTTP status endpoint on game + 3, and Minecraft's
  * query column mirrors the game port (the set dedupes it). Used by the start-time
@@ -169,6 +178,12 @@ export function forwardSpec(game: Game, ports: PortSet): ForwardPort[] {
         { port: ports.query, proto: "udp", label: "query (server browser)" },
         { port: ports.rawSocket, proto: "udp", label: "blob sync" },
       ];
+    case Game.SATISFACTORY:
+      return [
+        { port: ports.game, proto: "udp", label: "game" },
+        { port: ports.game, proto: "tcp", label: "server API (join/manage)" },
+        { port: ports.rawSocket, proto: "tcp", label: "reliable messaging" },
+      ];
     default:
       // ARK family + Conan: game + raw socket + query, all UDP.
       return [
@@ -190,5 +205,6 @@ export function portsFor(game: Game): PortSet {
   if (game === Game.ZOMBOID) return ZOMBOID_PORTS;
   if (game === Game.VRISING) return VRISING_PORTS;
   if (game === Game.SOTF) return SOTF_PORTS;
+  if (game === Game.SATISFACTORY) return SATISFACTORY_PORTS;
   return FIXED_PORTS;
 }

@@ -123,6 +123,9 @@ export const READY_RE_BY_GAME: Record<Game, RegExp> = {
   // Sons of the Forest logs its lobby/session registration once joinable.
   // PROVISIONAL — confirm against a real boot.
   [Game.SOTF]: /Session is advertised|accepting connections|GameServer(Online| started)/i,
+  // Satisfactory: the wolveix wrapper + Unreal log this region once the API/game
+  // ports are serving. PROVISIONAL — confirm against a real boot.
+  [Game.SATISFACTORY]: /Engine is initialized\. Leaving FEngineLoop::Init|Satisfactory Server is now running/i,
 };
 
 /** The "server is now joinable" log-marker regex for a game. */
@@ -1056,7 +1059,8 @@ export class ServersService implements OnApplicationBootstrap {
       game === Game.SEVEN_DAYS ||
       game === Game.ENSHROUDED ||
       game === Game.VRISING ||
-      game === Game.SOTF
+      game === Game.SOTF ||
+      game === Game.SATISFACTORY
     )
       return;
     if (!containerId || game === Game.CONAN || game === Game.MINECRAFT || game === Game.ZOMBOID) {

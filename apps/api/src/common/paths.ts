@@ -78,6 +78,10 @@ export const LocalPaths = {
         // dedicatedserver.cfg + ownerswhitelist + Saves live under userdata inside
         // the single game bind; the ~10 GB install beside it is skipped.
         return ["game/userdata"];
+      case Game.SATISFACTORY:
+        // Saves + blueprints + server config live under config/saved; the ~10 GB
+        // install (config/gamefiles) and the image's own backups dir are skipped.
+        return ["config/saved"];
       default:
         return ["ShooterGame/Saved"]; // ASA (POK)
     }

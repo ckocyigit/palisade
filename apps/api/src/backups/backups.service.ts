@@ -289,7 +289,8 @@ export class BackupsService {
       game === Game.ICARUS ||
       game === Game.SEVEN_DAYS ||
       game === Game.ENSHROUDED ||
-      game === Game.SOTF
+      game === Game.SOTF ||
+      game === Game.SATISFACTORY
     ) {
       const env = loadEnv();
       return [Number(env.PUID), Number(env.PGID)];

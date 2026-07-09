@@ -241,6 +241,31 @@ export function ConnectCommand({
     );
   }
 
+  if (game === Game.SATISFACTORY) {
+    return (
+      <div className={className}>
+        <div className="mb-1 flex items-center gap-1.5 text-xs font-medium text-slate-400">
+          <Terminal className="h-3.5 w-3.5" /> Add server (in-game)
+        </div>
+        <CopyRow value={`${hostOr}:${gamePort}`} title="Server address for Satisfactory's Server Manager" />
+        <p className="mt-1 text-[11px] leading-snug text-slate-500">
+          In Satisfactory: <span className="font-mono">Server Manager → Add Server</span> — enter this address.
+          Palisade already claimed the server with your server name + admin password, so it's ready to join.
+          Accept the self-signed certificate when prompted.
+        </p>
+        {joinPassword && (
+          <div className="mt-3">
+            <div className="mb-1 flex items-center gap-1.5 text-xs font-medium text-slate-400">
+              <Lock className="h-3.5 w-3.5" /> Join password
+            </div>
+            <CopyRow value={joinPassword} title="Copy the join password" />
+            <p className="mt-1 text-[11px] leading-snug text-slate-500">Enter this when it prompts.</p>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   if (game === Game.SOTF) {
     return (
       <div className={className}>

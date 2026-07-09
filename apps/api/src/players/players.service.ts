@@ -2,6 +2,8 @@ import { Injectable, Logger } from "@nestjs/common";
 import { Game, ServerState } from "@ark/shared";
 import { PrismaService } from "../prisma/prisma.service";
 import { RconService } from "../rcon/rcon.service";
+import { CryptoService } from "../crypto/crypto.service";
+import { satisfactoryQueryState } from "./satisfactory-api";
 import { containerName } from "../common/naming";
 import { loadEnv } from "../config/env";
 import { a2sInfo, raknetPing, type QueryCount } from "./query-protocols";
@@ -44,6 +46,7 @@ export class PlayersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly rcon: RconService,
+    private readonly crypto: CryptoService,
   ) {}
 
   /**
@@ -104,6 +107,16 @@ export class PlayersService {
       if (game === Game.BEDROCK) {
         const count = await raknetPing(host, server.gamePort);
         return { online: count.online, max: count.max ?? server.maxPlayers };
+      }
+      if (game === Game.SATISFACTORY) {
+        // The game's HTTPS API on the game port (no A2S). Passwordless Client
+        // login unless a join password forces the admin-password fallback.
+        const state = await satisfactoryQueryState(
+          host,
+          server.gamePort,
+          server.adminPasswordEnc ? this.crypto.decrypt(server.adminPasswordEnc) : null,
+        );
+        return state ? { online: state.online, max: state.max || server.maxPlayers } : null;
       }
       // ASA / Palworld / Minecraft / Zomboid: count via RCON (needs the admin password set).
       const players = await this.rcon.listPlayers(serverId);

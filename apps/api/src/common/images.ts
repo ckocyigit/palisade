@@ -48,6 +48,10 @@ export const IMAGES: Record<Game, string> = {
   // runs it under Wine as a non-root steam user (PUID/PGID). We render
   // userdata/dedicatedserver.cfg (the init script only seeds it when missing). NO RCON.
   [Game.SOTF]: "jammsen/sons-of-the-forest-dedicated-server:latest",
+  // wolveix — installs the native Linux Satisfactory server (app 1690800) via
+  // SteamCMD on boot into /config/gamefiles. Env-driven. No RCON — management is
+  // the game's own HTTPS API on the game port (see satisfactory-api.ts).
+  [Game.SATISFACTORY]: "wolveix/satisfactory-server:latest",
 };
 
 /** POK keeps all instance data (install + saves + config) under this path. */
@@ -106,6 +110,10 @@ export const VRISING_DATA_DIR = "/mnt/vrising/persistentdata";
  *  userdata (config + saves) at <vol>/userdata — backups target just userdata. */
 export const SOTF_GAME_DIR = "/sonsoftheforest";
 
+/** Satisfactory (wolveix): ONE /config volume holds gamefiles (~10 GB install),
+ *  saved (saves + blueprints + server config), backups, and logs. */
+export const SATISFACTORY_CONFIG_DIR = "/config";
+
 /**
  * The uid/gid each image runs the server as. Neither chowns its mounts fully
  * (POK never does; hermsi only chowns the volume root), so the manager makes the
@@ -125,6 +133,7 @@ export const SERVER_UID: Record<Game, number> = {
   [Game.ZOMBOID]: 1000, // danixu86 runs as the "steam" user
   [Game.VRISING]: 0, // trueosiris runs as root (no PUID/PGID support)
   [Game.SOTF]: 1000, // jammsen's steam user, remapped to env PUID/PGID (entrypoint chowns)
+  [Game.SATISFACTORY]: 1000, // wolveix runs the game as PUID/PGID (default 1000)
 };
 export const SERVER_GID: Record<Game, number> = {
   [Game.ASA]: 7777,
@@ -140,4 +149,5 @@ export const SERVER_GID: Record<Game, number> = {
   [Game.ZOMBOID]: 1000,
   [Game.VRISING]: 0,
   [Game.SOTF]: 1000,
+  [Game.SATISFACTORY]: 1000,
 };

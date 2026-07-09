@@ -13,6 +13,7 @@ import { ENSHROUDED_CATALOG } from "./enshrouded.catalog";
 import { ZOMBOID_CATALOG } from "./zomboid.catalog";
 import { VRISING_CATALOG } from "./vrising.catalog";
 import { SOTF_CATALOG } from "./sotf.catalog";
+import { SATISFACTORY_CATALOG } from "./satisfactory.catalog";
 import { serializeGameIni, serializeGameUserSettings } from "./ini-serializer";
 
 @Injectable()
@@ -31,6 +32,7 @@ export class CatalogService {
     if (game === Game.ZOMBOID) return ZOMBOID_CATALOG;
     if (game === Game.VRISING) return VRISING_CATALOG;
     if (game === Game.SOTF) return SOTF_CATALOG;
+    if (game === Game.SATISFACTORY) return SATISFACTORY_CATALOG;
     throw new NotFoundException(`Unknown game: ${game}`);
   }
 

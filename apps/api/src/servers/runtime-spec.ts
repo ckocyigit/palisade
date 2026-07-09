@@ -31,6 +31,7 @@ import {
   VRISING_SERVER_DIR,
   VRISING_DATA_DIR,
   SOTF_GAME_DIR,
+  SATISFACTORY_CONFIG_DIR,
 } from "../common/images";
 import { ZOMBOID_STEAM_PORTS } from "../catalog/ports";
 import { SOTF_GAME_SETTINGS_KEYS } from "../catalog/sotf.catalog";
@@ -75,6 +76,7 @@ export function buildContainerSpec(input: RuntimeSpecInput): Docker.ContainerCre
   if (input.game === Game.ZOMBOID) return buildZomboidSpec(input);
   if (input.game === Game.VRISING) return buildVRisingSpec(input);
   if (input.game === Game.SOTF) return buildSotfSpec(input);
+  if (input.game === Game.SATISFACTORY) return buildSatisfactorySpec(input);
   return buildAseSpec(input);
 }
 
@@ -1291,6 +1293,77 @@ export function renderSotfConfig(input: {
     CustomGameModeSettings: {},
   };
   return JSON.stringify(cfg, null, 2);
+}
+
+/**
+ * Satisfactory: drive the wolveix image via env vars. It installs the native Linux
+ * server (app 1690800) via SteamCMD on boot into /config/gamefiles and runs it as
+ * PUID/PGID. The game port carries UDP game traffic AND the TCP HTTPS server API;
+ * 8888 TCP is the reliable-messaging port. There's no RCON — the manager claims
+ * the server + reads player counts through the HTTPS API (satisfactory-api.ts).
+ */
+function buildSatisfactorySpec(input: RuntimeSpecInput): Docker.ContainerCreateOptions {
+  const env = loadEnv();
+  const { ports } = input;
+
+  const satisfactoryEnv = [
+    `TZ=${input.timezone || env.TZ}`,
+    `PUID=${env.PUID}`,
+    `PGID=${env.PGID}`,
+    `MAXPLAYERS=${input.maxPlayers}`,
+    `SERVERGAMEPORT=${ports.game}`, // 7777 (udp game + tcp API)
+    `SERVERMESSAGINGPORT=${ports.rawSocket}`, // 8888 tcp
+    ...satisfactoryCatalogEnv(input),
+  ];
+
+  const binds = [`${HostPaths.instanceRoot(input.serverId)}/config:${SATISFACTORY_CONFIG_DIR}`];
+
+  const hostNet = env.GAME_HOST_NETWORK;
+  return {
+    name: containerName(input.serverId, input.game, input.sessionName),
+    Image: IMAGES[Game.SATISFACTORY],
+    Hostname: containerName(input.serverId, input.game, input.sessionName),
+    Env: satisfactoryEnv,
+    Labels: serverLabels(input, env.PUBLIC_BASE_URL),
+    ...(hostNet
+      ? {}
+      : {
+          ExposedPorts: {
+            [portKey(ports.game, "udp")]: {},
+            [portKey(ports.game, "tcp")]: {},
+            [portKey(ports.rawSocket, "tcp")]: {},
+          },
+        }),
+    HostConfig: {
+      Binds: binds,
+      ...(hostNet
+        ? { NetworkMode: "host" }
+        : {
+            PortBindings: {
+              [portKey(ports.game, "udp")]: [{ HostPort: String(ports.game) }],
+              [portKey(ports.game, "tcp")]: [{ HostPort: String(ports.game) }],
+              [portKey(ports.rawSocket, "tcp")]: [{ HostPort: String(ports.rawSocket) }],
+            },
+          }),
+      RestartPolicy: { Name: "no" }, // manager watchdog owns restarts
+      Memory: input.ramLimitMb ? input.ramLimitMb * 1024 * 1024 : undefined,
+      NanoCpus: input.cpuLimit ? Math.round(input.cpuLimit * 1e9) : undefined,
+    },
+    ...(hostNet ? {} : { NetworkingConfig: { EndpointsConfig: { [ARK_NETWORK]: {} } } }),
+  };
+}
+
+/** Satisfactory settings -> wolveix env vars. Booleans become true/false; empty dropped. */
+function satisfactoryCatalogEnv(input: RuntimeSpecInput): string[] {
+  const out: string[] = [];
+  for (const def of input.catalog.settings) {
+    if (def.target !== SettingTarget.Env) continue;
+    const raw = input.config.values?.[def.key] ?? def.default;
+    if (raw === undefined || raw === null || raw === "") continue;
+    const val = typeof raw === "boolean" ? (raw ? "true" : "false") : String(raw);
+    out.push(`${def.emitAs ?? def.key}=${val}`);
+  }
+  return out;
 }
 
 /**

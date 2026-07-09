@@ -26,6 +26,8 @@ export enum Game {
   VRISING = "VRISING",
   /** Sons of the Forest — jammsen image (SteamCMD under Wine); we render dedicatedserver.cfg; NO RCON. */
   SOTF = "SOTF",
+  /** Satisfactory — wolveix image (native Linux), env-driven; HTTPS server API (no RCON). */
+  SATISFACTORY = "SATISFACTORY",
 }
 
 /** Friendly game names for the UI. */
@@ -43,6 +45,7 @@ export const GAME_LABELS: Record<Game, string> = {
   [Game.ZOMBOID]: "Project Zomboid",
   [Game.VRISING]: "V Rising",
   [Game.SOTF]: "Sons of the Forest",
+  [Game.SATISFACTORY]: "Satisfactory",
 };
 
 /** SteamCMD app IDs for the dedicated server (anonymous login). */
@@ -71,6 +74,8 @@ export const STEAM_APP_ID: Record<Game, number> = {
   [Game.VRISING]: 1829350,
   // Sons of the Forest dedicated server (the jammsen image installs it via SteamCMD).
   [Game.SOTF]: 2465200,
+  // Satisfactory dedicated server (the wolveix image installs it via SteamCMD).
+  [Game.SATISFACTORY]: 1690800,
 };
 
 /** Steam Workshop "consumer" app ids for mod downloads (ARK: Survival Evolved /
@@ -111,6 +116,7 @@ export const GAME_ICONS: Record<Game, string> = {
   [Game.ZOMBOID]: "https://cdn.cloudflare.steamstatic.com/steam/apps/108600/header.jpg",
   [Game.VRISING]: "https://cdn.cloudflare.steamstatic.com/steam/apps/1604030/header.jpg",
   [Game.SOTF]: "https://cdn.cloudflare.steamstatic.com/steam/apps/1326470/header.jpg",
+  [Game.SATISFACTORY]: "https://cdn.cloudflare.steamstatic.com/steam/apps/526870/header.jpg",
 };
 
 /** CurseForge numeric game id for ASA (used by the mod browser). */
@@ -161,6 +167,8 @@ export const RAM_ESTIMATE_MB: Record<Game, number> = {
   [Game.VRISING]: 6000,
   // Sons of the Forest under Wine is heavy — jammsen recommend 8-16 GB.
   [Game.SOTF]: 12000,
+  // Satisfactory: 8-16 GB recommended; grows with factory size/late game.
+  [Game.SATISFACTORY]: 8000,
 };
 
 /**
@@ -183,6 +191,7 @@ export const MAX_PLAYERS_BY_GAME: Record<Game, number> = {
   [Game.ZOMBOID]: 64, // no hard cap; 32+ needs serious JVM memory
   [Game.VRISING]: 40, // Stunlock's supported ceiling (MaxConnectedUsers)
   [Game.SOTF]: 8, // Endnight's design cap for multiplayer
+  [Game.SATISFACTORY]: 16, // no hard cap; >8 needs serious hardware (default is 4)
 };
 
 /** The default player count the create form pre-fills per game (a sensible starting
@@ -201,6 +210,7 @@ export const DEFAULT_MAX_PLAYERS_BY_GAME: Record<Game, number> = {
   [Game.ZOMBOID]: 16,
   [Game.VRISING]: 10,
   [Game.SOTF]: 8,
+  [Game.SATISFACTORY]: 4,
 };
 
 /** A password field on the create form: whether to show it at all, its label, an
@@ -244,6 +254,11 @@ export const ADMIN_PASSWORD_META: Record<Game, PasswordFieldMeta> = {
   },
   [Game.VRISING]: { show: true, label: "RCON password (enables the console)" },
   [Game.SOTF]: { show: false, label: "" }, // no RCON/console; admins via ownerswhitelist
+  [Game.SATISFACTORY]: {
+    show: true,
+    label: "Admin password (claims the server)",
+    help: "Palisade claims the server through its API on first boot with this password — no in-game claim needed. It also unlocks the in-game Server Manager.",
+  },
 };
 
 /** The join (server) password field, per game. Every game can have one, but Valheim
@@ -274,6 +289,7 @@ export const JOIN_PASSWORD_META: Record<Game, PasswordFieldMeta> = {
   [Game.ZOMBOID]: { show: true, label: "Server password (players need it to join)" },
   [Game.VRISING]: { show: true, label: "Server password (players need it to join)" },
   [Game.SOTF]: { show: true, label: "Server password (players need it to join)" },
+  [Game.SATISFACTORY]: { show: true, label: "Server password (players need it to join)" },
 };
 
 /** Default port offsets within a per-server allocation block. */
@@ -364,6 +380,9 @@ export const VRISING_OFFICIAL_MAPS = ["Vardoran"] as const;
  *  the save is created with (like Minecraft's world type). */
 export const SOTF_OFFICIAL_MAPS = ["Normal", "Hard", "Peaceful", "Creative"] as const;
 
+/** Satisfactory has a single fixed planet — no map choice. */
+export const SATISFACTORY_OFFICIAL_MAPS = ["Satisfactory"] as const;
+
 /** Friendly display names for known level names (raw level → label). */
 export const MAP_LABELS: Record<string, string> = {
   // Conan Exiles
@@ -392,6 +411,8 @@ export const MAP_LABELS: Record<string, string> = {
   "Muldraugh, KY": "Knox Country (full map)",
   // V Rising
   Vardoran: "Vardoran",
+  // Satisfactory (single planet)
+  Satisfactory: "MASSAGE-2 (A-B) b",
   // Sons of the Forest game modes (repurposed map field)
   Normal: "Normal (survival)",
   Hard: "Hard (survival)",
