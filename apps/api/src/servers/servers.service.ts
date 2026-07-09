@@ -172,6 +172,9 @@ export class ServersService implements OnApplicationBootstrap {
   /** On-disk instance size (MB), refreshed in the background — `du` is too slow to
    *  run inline on every stats poll. */
   private readonly diskCache = new Map<string, { mb: number; at: number }>();
+  /** When the last teardown finished — lets the RAM guard debounce the window in
+   *  which the freed memory isn't yet visible in /proc/meminfo (restart races). */
+  private lastStopCompletedAt = 0;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -767,30 +770,69 @@ export class ServersService implements OnApplicationBootstrap {
   }
 
   /** Throw a 409 (with the running servers + RAM) if starting `id` would exceed the
-   *  host's free RAM. A server's ramLimitMb overrides the per-game estimate. */
+   *  host's free RAM. A server's ramLimitMb overrides the per-game estimate.
+   *
+   *  Debounce: right after a container stops (a restart, or a start racing a
+   *  manual stop), the freed memory takes a few seconds to show up in
+   *  /proc/meminfo — a naive single sample rejects a 12 GB game on a box that's
+   *  about to have 18 GB free (seen live with Sons of the Forest). So when the
+   *  first sample fails INSIDE that post-stop window, re-sample for up to ~15 s
+   *  before giving up. A failure with no recent stop still rejects instantly,
+   *  keeping the swap dialog snappy in the genuine-shortage case. */
   private async assertRamAvailable(id: string): Promise<void> {
     const server = await this.prisma.server.findUnique({ where: { id } });
     if (!server) throw new NotFoundException("Server not found");
     const needMb = server.ramLimitMb ?? RAM_ESTIMATE_MB[server.game as Game];
+
+    const RECENT_STOP_WINDOW_MS = 30_000;
+    const RETRY_DELAY_MS = 3_000;
+    const MAX_RETRIES = 5;
+
+    let sample = await this.sampleAvailableRam();
+    let retries = 0;
+    while (
+      needMb > sample.availableMb &&
+      retries < MAX_RETRIES &&
+      (this.stopping.size > 0 || Date.now() - this.lastStopCompletedAt < RECENT_STOP_WINDOW_MS)
+    ) {
+      retries += 1;
+      this.logger.log(
+        `RAM guard: ${needMb}MB needed, ${sample.availableMb}MB free just after a stop — re-sampling (${retries}/${MAX_RETRIES})`,
+      );
+      await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
+      sample = await this.sampleAvailableRam();
+    }
+    if (needMb <= sample.availableMb) return;
+    throw new ConflictException({
+      code: "INSUFFICIENT_RAM",
+      needMb,
+      availableMb: sample.availableMb,
+      totalMb: sample.totalMb,
+      running: sample.running,
+      autoStop: await this.settings.getAutoStopOnStart(),
+    } satisfies InsufficientRamInfo);
+  }
+
+  /** One free-RAM measurement: host free memory minus each running server's
+   *  remaining headroom up to its peak estimate — so a not-yet-peaked server
+   *  (e.g. an empty one that fills up) can't OOM the box after we start another.
+   *  Headroom is 0 when we can't read a server's usage. */
+  private async sampleAvailableRam(): Promise<{
+    availableMb: number;
+    totalMb: number;
+    running: RunningServerRam[];
+  }> {
     const host = await hostStats(loadEnv().DATA_DIR);
     const running = await this.runningServersRam();
-    // Free RAM now, minus each running server's remaining headroom up to its peak
-    // estimate — so a not-yet-peaked server (e.g. an empty one that fills up) can't
-    // OOM the box after we start another. Headroom is 0 when we can't read its usage.
     const reservedMb = running.reduce((sum, r) => {
       const est = RAM_ESTIMATE_MB[r.game];
       return sum + Math.max(0, est - (r.ramUsedMb ?? est));
     }, 0);
-    const availableMb = Math.max(0, host.memTotalMb - host.memUsedMb - reservedMb);
-    if (needMb <= availableMb) return;
-    throw new ConflictException({
-      code: "INSUFFICIENT_RAM",
-      needMb,
-      availableMb,
+    return {
+      availableMb: Math.max(0, host.memTotalMb - host.memUsedMb - reservedMb),
       totalMb: host.memTotalMb,
       running,
-      autoStop: await this.settings.getAutoStopOnStart(),
-    } satisfies InsufficientRamInfo);
+    };
   }
 
   /** Currently-running servers with their live RAM + players, for the start-guard
@@ -1035,6 +1077,9 @@ export class ServersService implements OnApplicationBootstrap {
       this.logger.log(`stop(${id}): teardown complete → Stopped`);
     } finally {
       this.stopping.delete(id);
+      // The kernel takes a few seconds to reflect the freed memory in /proc/meminfo
+      // after a container dies — the RAM guard debounces against this timestamp.
+      this.lastStopCompletedAt = Date.now();
     }
   }
 
