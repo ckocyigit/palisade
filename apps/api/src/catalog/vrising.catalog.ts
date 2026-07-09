@@ -147,7 +147,9 @@ const settings: SettingDef[] = [
   ),
 
   // ── Server / visibility ───────────────────────────────────────────────────────
-  vset("HOST_SETTINGS_ListOnSteam", "List on Steam browser", "Server", "bool", false),
+  vset("HOST_SETTINGS_ListOnSteam", "List on Steam browser", "Server", "bool", false, {
+    help: "Also enables the Steam query responder — live player counts in the dashboard need this on (verified live).",
+  }),
   vset("HOST_SETTINGS_ListOnEOS", "List on EOS (crossplay)", "Server", "bool", false),
   vset("HOST_SETTINGS_Description", "Server description", "Server", "string", ""),
   vset("HOST_SETTINGS_Secure", "VAC secure", "Server", "bool", true),
