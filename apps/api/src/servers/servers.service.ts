@@ -146,9 +146,11 @@ export const READY_RE_BY_GAME: Record<Game, RegExp> = {
   [Game.ATS]: /\[MP\] Server init/i,
   // ETS2: same engine + wrapper as ATS — same stdout marker.
   [Game.ETS2]: /\[MP\] Server init/i,
-  // Core Keeper: the wrapper prints the join token ("Started session with Game ID
-  // …") once the world is hosted on the relay. PROVISIONAL — confirm live.
-  [Game.CORE_KEEPER]: /Game ID/i,
+  // Core Keeper logs "Started session with info: <GameID>" the moment the session
+  // is registered on Steam's relay and joinable — CONFIRMED live. (The early
+  // "failed to initialize steam." line is a non-fatal first try; the retry
+  // succeeds and "Listening on SteamID" precedes this marker.)
+  [Game.CORE_KEEPER]: /Started session with info/i,
 };
 
 /** The "server is now joinable" log-marker regex for a game. */
