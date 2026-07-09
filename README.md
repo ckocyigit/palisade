@@ -10,7 +10,7 @@ container spawns and supervises a container per game server, manages every
 setting through schema-driven forms, and handles mods, backups, schedules,
 player administration, and even your router's port-forwards.
 
-**Supported games (21):**
+**Supported games (22):**
 
 | Game | Runtime | Console | Mods |
 |---|---|---|---|
@@ -35,6 +35,7 @@ player administration, and even your router's port-forwards.
 | Terraria (TShock) | native | — (REST-powered counts) | plugin folder (TShock ServerPlugins) |
 | Factorio | native | RCON | mods folder (+ mod-portal auto-update) |
 | Rust | native | RCON | Oxide/uMod toggle (plugins folder) |
+| BeamNG.drive (BeamMP) | native | — | client-mod + Lua plugin folders |
 
 **Feature highlights**
 
@@ -274,6 +275,7 @@ wouldn't exist without them:
 | Terraria | `ryshe/terraria` | [Ryan Sheehan](https://github.com/ryansheehan/terraria) (built on [TShock](https://github.com/Pryaxis/TShock)) |
 | Factorio | `factoriotools/factorio` | [factoriotools](https://github.com/factoriotools/factorio-docker) |
 | Rust | `didstopia/rust-server` | [Didstopia](https://github.com/Didstopia/rust-server) |
+| BeamNG.drive | `rouhim/beammp-server` | [RouHim](https://github.com/RouHim/beammp-container-image) (built on [BeamMP](https://beammp.com)) |
 
 Also standing on: [SteamCMD](https://developer.valvesoftware.com/wiki/SteamCMD),
 GE-Proton/Wine for the Windows-only servers,
