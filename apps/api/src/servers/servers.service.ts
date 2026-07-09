@@ -128,10 +128,11 @@ export const READY_RE_BY_GAME: Record<Game, RegExp> = {
   // fires right as the game port starts listening — CONFIRMED live (the API
   // claim + query follow within seconds).
   [Game.SATISFACTORY]: /Engine is initialized\. Leaving FEngineLoop::Init|Satisfactory Server is now running/i,
-  // LiF:YO: the container tails the game's own log after launching it under Wine.
-  // PROVISIONAL — confirm against a real boot. (NOT the wrapper's "---Server
-  // ready---", which fires BEFORE the wine launch.)
-  [Game.LIF]: /Server started|listening on|Steam game server.*(init|logged)/i,
+  // LiF:YO: the game logs "Server is up and ready to accept connections" after the
+  // DB import + world/navmesh generation — CONFIRMED live (the TCP listener line
+  // and Steam registration follow within seconds). NOT the wrapper's "---Server
+  // ready---", which fires BEFORE the wine launch.
+  [Game.LIF]: /Server is up and ready to accept connections/i,
 };
 
 /** The "server is now joinable" log-marker regex for a game. */
