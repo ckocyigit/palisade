@@ -15,6 +15,7 @@ import { VRISING_CATALOG } from "./vrising.catalog";
 import { SOTF_CATALOG } from "./sotf.catalog";
 import { SATISFACTORY_CATALOG } from "./satisfactory.catalog";
 import { LIF_CATALOG } from "./lif.catalog";
+import { ATS_CATALOG } from "./ats.catalog";
 import { serializeGameIni, serializeGameUserSettings } from "./ini-serializer";
 
 @Injectable()
@@ -35,6 +36,7 @@ export class CatalogService {
     if (game === Game.SOTF) return SOTF_CATALOG;
     if (game === Game.SATISFACTORY) return SATISFACTORY_CATALOG;
     if (game === Game.LIF) return LIF_CATALOG;
+    if (game === Game.ATS) return ATS_CATALOG;
     throw new NotFoundException(`Unknown game: ${game}`);
   }
 

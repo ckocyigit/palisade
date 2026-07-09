@@ -30,6 +30,8 @@ export enum Game {
   SATISFACTORY = "SATISFACTORY",
   /** Life is Feudal: Your Own — ich777 image (Wine + bundled MariaDB); we patch world_1.xml; NO RCON. */
   LIF = "LIF",
+  /** American Truck Simulator — ich777 image (native Linux); we patch server_config.sii; NO RCON. */
+  ATS = "ATS",
 }
 
 /** Friendly game names for the UI. */
@@ -49,6 +51,7 @@ export const GAME_LABELS: Record<Game, string> = {
   [Game.SOTF]: "Sons of the Forest",
   [Game.SATISFACTORY]: "Satisfactory",
   [Game.LIF]: "Life is Feudal: Your Own",
+  [Game.ATS]: "American Truck Simulator",
 };
 
 /** SteamCMD app IDs for the dedicated server (anonymous login). */
@@ -81,6 +84,8 @@ export const STEAM_APP_ID: Record<Game, number> = {
   [Game.SATISFACTORY]: 1690800,
   // Life is Feudal: Your Own dedicated server (the ich777 image installs it via SteamCMD).
   [Game.LIF]: 320850,
+  // American Truck Simulator dedicated server (the ich777 image installs it via SteamCMD).
+  [Game.ATS]: 2239530,
 };
 
 /** Steam Workshop "consumer" app ids for mod downloads (ARK: Survival Evolved /
@@ -123,6 +128,7 @@ export const GAME_ICONS: Record<Game, string> = {
   [Game.SOTF]: "https://cdn.cloudflare.steamstatic.com/steam/apps/1326470/header.jpg",
   [Game.SATISFACTORY]: "https://cdn.cloudflare.steamstatic.com/steam/apps/526870/header.jpg",
   [Game.LIF]: "https://cdn.cloudflare.steamstatic.com/steam/apps/290080/header.jpg",
+  [Game.ATS]: "https://cdn.cloudflare.steamstatic.com/steam/apps/270880/header.jpg",
 };
 
 /** CurseForge numeric game id for ASA (used by the mod browser). */
@@ -177,6 +183,8 @@ export const RAM_ESTIMATE_MB: Record<Game, number> = {
   [Game.SATISFACTORY]: 8000,
   // LiF:YO under Wine PLUS the bundled MariaDB — ~6-8 GB populated.
   [Game.LIF]: 8000,
+  // ATS's dedicated server is tiny — well under 2 GB even with 8 players.
+  [Game.ATS]: 2000,
 };
 
 /**
@@ -201,6 +209,7 @@ export const MAX_PLAYERS_BY_GAME: Record<Game, number> = {
   [Game.SOTF]: 8, // Endnight's design cap for multiplayer
   [Game.SATISFACTORY]: 16, // no hard cap; >8 needs serious hardware (default is 4)
   [Game.LIF]: 64, // world_1.xml maxPlayers hard range 1-64
+  [Game.ATS]: 8, // SCS's hard cap for Convoy sessions
 };
 
 /** The default player count the create form pre-fills per game (a sensible starting
@@ -221,6 +230,7 @@ export const DEFAULT_MAX_PLAYERS_BY_GAME: Record<Game, number> = {
   [Game.SOTF]: 8,
   [Game.SATISFACTORY]: 4,
   [Game.LIF]: 16,
+  [Game.ATS]: 8,
 };
 
 /** A password field on the create form: whether to show it at all, its label, an
@@ -274,6 +284,7 @@ export const ADMIN_PASSWORD_META: Record<Game, PasswordFieldMeta> = {
     label: "GM / admin password",
     help: "Unlocks in-game GM mode. NOTE: the game files (and config) install on the FIRST start, so name + passwords apply from the second start — restart once after the first boot.",
   },
+  [Game.ATS]: { show: false, label: "" }, // no admin/console concept — session host moderates
 };
 
 /** The join (server) password field, per game. Every game can have one, but Valheim
@@ -306,6 +317,11 @@ export const JOIN_PASSWORD_META: Record<Game, PasswordFieldMeta> = {
   [Game.SOTF]: { show: true, label: "Server password (players need it to join)" },
   [Game.SATISFACTORY]: { show: true, label: "Server password (players need it to join)" },
   [Game.LIF]: { show: true, label: "Server password (players need it to join)" },
+  [Game.ATS]: {
+    show: true,
+    label: "Session password (players need it to join)",
+    help: "Applies from the second start — the config file is seeded on the first boot.",
+  },
 };
 
 /** Default port offsets within a per-server allocation block. */
@@ -402,6 +418,9 @@ export const SATISFACTORY_OFFICIAL_MAPS = ["Satisfactory"] as const;
 /** LiF:YO has a single fixed 3x3 km island — no map choice. */
 export const LIF_OFFICIAL_MAPS = ["Abella"] as const;
 
+/** ATS's world is fixed by the server_packages export — no map choice here. */
+export const ATS_OFFICIAL_MAPS = ["ATSWorld"] as const;
+
 /** Friendly display names for known level names (raw level → label). */
 export const MAP_LABELS: Record<string, string> = {
   // Conan Exiles
@@ -434,6 +453,8 @@ export const MAP_LABELS: Record<string, string> = {
   Satisfactory: "MASSAGE-2 (A-B) b",
   // Life is Feudal: Your Own (single island)
   Abella: "The island (3\u00d73 km)",
+  // American Truck Simulator (world defined by server_packages)
+  ATSWorld: "The West (base map + exported DLCs)",
   // Sons of the Forest game modes (repurposed map field)
   Normal: "Normal (survival)",
   Hard: "Hard (survival)",

@@ -1,0 +1,65 @@
+import { Game, SettingTarget, type SettingsCatalog, type SettingDef } from "@ark/shared";
+
+/**
+ * American Truck Simulator catalog. The dedicated server has no env-var interface —
+ * everything lives in `server_config.sii` inside the game's save dir (seeded by the
+ * ich777 image's bundled template on FIRST boot, so it can't be pre-written; once
+ * present, patchAtsServerConfig patches it before every start). Keys here are the
+ * sii attribute names, patched 1:1.
+ *
+ * First-class fields the orchestrator owns (lobby_name, password, max_players,
+ * connection/query ports) are NOT here. No RCON. The world/DLC set comes from the
+ * server_packages export — replaceable via the saves-upload flow.
+ */
+function aset(
+  key: string,
+  label: string,
+  category: string,
+  type: SettingDef["type"],
+  def: SettingDef["default"],
+  extra: Partial<SettingDef> = {},
+): SettingDef {
+  return { key, label, category, target: SettingTarget.Env, type, default: def, emitAs: key, ...extra };
+}
+
+const settings: SettingDef[] = [
+  // ── Session ───────────────────────────────────────────────────────────────────
+  aset("description", "Server description", "Session", "string", ""),
+  aset("welcome_message", "Welcome message", "Session", "string", ""),
+  aset("friends_only", "Friends only", "Session", "bool", false),
+  aset("show_server", "Visible in session search", "Session", "bool", true),
+  aset("mods_optioning", "Allow optional mods", "Session", "bool", false, {
+    help: "Players may join with mods the session host doesn't run.",
+  }),
+  aset("server_logon_token", "Steam logon token", "Session", "string", "", {
+    help: "Optional Game Server Login Token (steamcommunity.com/dev/managegameservers, app 270880) for a persistent server identity.",
+  }),
+
+  // ── Gameplay ──────────────────────────────────────────────────────────────────
+  aset("player_damage", "Player collision damage", "Gameplay", "bool", true),
+  aset("force_speed_limiter", "Force speed limiter", "Gameplay", "bool", false),
+  aset("timezones", "Timezone simulation", "Gameplay", "int", 0, {
+    min: 0,
+    max: 2,
+    help: "0 off, 1 in-game local time, 2 real timezones.",
+  }),
+  aset("name_tags", "Show name tags", "Gameplay", "bool", true),
+  aset("hide_in_company", "Ghost players in company areas", "Gameplay", "bool", false),
+  aset("hide_colliding", "Ghost colliding vehicles", "Gameplay", "bool", true),
+  aset("service_no_collision", "No collision at services", "Gameplay", "bool", false),
+  aset("in_menu_ghosting", "Ghost players in menu", "Gameplay", "bool", false),
+
+  // ── Traffic ───────────────────────────────────────────────────────────────────
+  aset("traffic", "AI traffic", "Traffic", "bool", true),
+  aset("max_vehicles_total", "Max vehicles total", "Traffic", "int", 100, { min: 0, max: 512 }),
+  aset("max_ai_vehicles_player", "Max AI vehicles per player", "Traffic", "int", 50, {
+    min: 0,
+    max: 256,
+  }),
+  aset("max_ai_vehicles_player_spawn", "Max AI spawns per player", "Traffic", "int", 50, {
+    min: 0,
+    max: 256,
+  }),
+];
+
+export const ATS_CATALOG: SettingsCatalog = { game: Game.ATS, version: "1", settings };

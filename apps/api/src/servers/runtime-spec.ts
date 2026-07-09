@@ -35,6 +35,7 @@ import {
   LIF_STEAMCMD_DIR,
   LIF_SERVERFILES_DIR,
 } from "../common/images";
+// (ATS reuses the ich777 wrapper mount points LIF_STEAMCMD_DIR / LIF_SERVERFILES_DIR.)
 import { ZOMBOID_STEAM_PORTS } from "../catalog/ports";
 import { SOTF_GAME_SETTINGS_KEYS } from "../catalog/sotf.catalog";
 import { LIF_SKILLCAP_GROUPS } from "../catalog/lif.catalog";
@@ -81,6 +82,7 @@ export function buildContainerSpec(input: RuntimeSpecInput): Docker.ContainerCre
   if (input.game === Game.SOTF) return buildSotfSpec(input);
   if (input.game === Game.SATISFACTORY) return buildSatisfactorySpec(input);
   if (input.game === Game.LIF) return buildLifSpec(input);
+  if (input.game === Game.ATS) return buildAtsSpec(input);
   return buildAseSpec(input);
 }
 
@@ -1438,6 +1440,102 @@ function buildLifSpec(input: RuntimeSpecInput): Docker.ContainerCreateOptions {
 }
 
 const STEAM_APP_ID_LIF = 320850;
+
+/**
+ * American Truck Simulator — same ich777 SteamCMD wrapper as LiF:YO, but the
+ * dedicated server is NATIVE Linux (bin/linux_x64/amtrucks_server) and the image
+ * seeds a default server_packages world export + server_config.sii into the save
+ * dir on first boot (normally the awkward part: exporting them from a game
+ * client). All settings live in server_config.sii, patched by
+ * patchAtsServerConfig before each start. NO RCON.
+ */
+function buildAtsSpec(input: RuntimeSpecInput): Docker.ContainerCreateOptions {
+  const env = loadEnv();
+  const { ports } = input;
+
+  const atsEnv = [
+    `TZ=${input.timezone || env.TZ}`,
+    `GAME_ID=2239530`,
+    `GAME_PARAMS=`,
+    `UID=${env.PUID}`,
+    `GID=${env.PGID}`,
+    `VALIDATE=`,
+  ];
+
+  const root = HostPaths.instanceRoot(input.serverId);
+  const binds = [
+    `${root}/steamcmd:${LIF_STEAMCMD_DIR}`,
+    `${root}/serverfiles:${LIF_SERVERFILES_DIR}`,
+  ];
+
+  const udpPorts = [ports.game, ports.query]; // 27015 connection + 27016 query
+  const hostNet = env.GAME_HOST_NETWORK;
+  return {
+    name: containerName(input.serverId, input.game, input.sessionName),
+    Image: IMAGES[Game.ATS],
+    Hostname: containerName(input.serverId, input.game, input.sessionName),
+    Env: atsEnv,
+    Labels: serverLabels(input, env.PUBLIC_BASE_URL),
+    ...(hostNet
+      ? {}
+      : { ExposedPorts: Object.fromEntries(udpPorts.map((p) => [portKey(p, "udp"), {}])) }),
+    HostConfig: {
+      Binds: binds,
+      ...(hostNet
+        ? { NetworkMode: "host" }
+        : {
+            PortBindings: Object.fromEntries(
+              udpPorts.map((p) => [portKey(p, "udp"), [{ HostPort: String(p) }]]),
+            ),
+          }),
+      RestartPolicy: { Name: "no" }, // manager watchdog owns restarts
+      Memory: input.ramLimitMb ? input.ramLimitMb * 1024 * 1024 : undefined,
+      NanoCpus: input.cpuLimit ? Math.round(input.cpuLimit * 1e9) : undefined,
+    },
+    ...(hostNet ? {} : { NetworkingConfig: { EndpointsConfig: { [ARK_NETWORK]: {} } } }),
+  };
+}
+
+/**
+ * Patch an ATS server_config.sii in place: first-class fields (lobby name, join
+ * password, slots, ports) plus the catalog's attributes, preserving the unit
+ * header and any unknown/future keys. SII scalars: strings quoted, bools
+ * true/false, ints bare. Only existing keys are touched (a key the game
+ * removed/renamed is skipped rather than corrupting the file).
+ */
+export function patchAtsServerConfig(
+  sii: string,
+  input: {
+    sessionName: string;
+    serverPassword: string;
+    maxPlayers: number;
+    gamePort: number;
+    queryPort: number;
+    catalog: SettingsCatalog;
+    config: ServerConfigValues;
+  },
+): string {
+  const set = (doc: string, key: string, rendered: string): string =>
+    doc.replace(new RegExp(`(^\\s*${key}\\s*:\\s*).*$`, "m"), `$1${rendered}`);
+  const str = (v: unknown): string => `"${String(v).replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+
+  let doc = sii;
+  doc = set(doc, "lobby_name", str(input.sessionName.slice(0, 63)));
+  doc = set(doc, "password", str(input.serverPassword.slice(0, 63)));
+  doc = set(doc, "max_players", String(Math.min(Math.max(input.maxPlayers, 1), 8)));
+  doc = set(doc, "connection_dedicated_port", String(input.gamePort));
+  doc = set(doc, "query_dedicated_port", String(input.queryPort));
+
+  for (const def of input.catalog.settings) {
+    if (def.target !== SettingTarget.Env) continue;
+    const raw = input.config.values?.[def.key] ?? def.default;
+    if (raw === undefined || raw === null) continue;
+    const rendered =
+      typeof raw === "boolean" ? (raw ? "true" : "false") : def.type === "string" ? str(raw) : String(raw);
+    doc = set(doc, def.emitAs ?? def.key, rendered);
+  }
+  return doc;
+}
 
 /**
  * Patch a LiF:YO world_1.xml in place: first-class fields (name, join + GM

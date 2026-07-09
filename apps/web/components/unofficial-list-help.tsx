@@ -44,6 +44,7 @@ export function UnofficialListHelp({
   const sotf = game === Game.SOTF;
   const satisfactory = game === Game.SATISFACTORY;
   const lif = game === Game.LIF;
+  const ats = game === Game.ATS;
   const passwordHint = hasJoinPassword
     ? "your server has a join password"
     : "ON only if you set a join password";
@@ -62,7 +63,7 @@ export function UnofficialListHelp({
             ? "Add it to your Minecraft server list"
             : satisfactory
               ? "Add it to your Server Manager"
-            : conan || palworld || icarus || valheim || sdtd || enshrouded || zomboid || vrising || sotf || lif
+            : conan || palworld || icarus || valheim || sdtd || enshrouded || zomboid || vrising || sotf || lif || ats
               ? "Find it in the in-game server browser"
               : "Find it on the in-game Unofficial list"}
         </span>
@@ -84,6 +85,19 @@ export function UnofficialListHelp({
             <p className="pt-1 leading-snug text-slate-400">
               Search the name <span className="font-mono text-slate-200">{serverName}</span>, or use{" "}
               <span className="text-slate-200">Connect to Server</span> with the address shown above.
+            </p>
+          </div>
+        ) : ats ? (
+          <div className="space-y-1.5 border-t border-ark-border px-2.5 py-2 text-xs">
+            <p className="text-slate-400">
+              In <span className="text-slate-200">Convoy → search sessions</span>:
+            </p>
+            <FilterRow state="on" label="Search the session list by name (needs 'Visible in session search' on)" />
+            <FilterRow state={hasJoinPassword ? "on" : "off"} label="Password prompt on join" hint={passwordHint} />
+            <p className="pt-1 leading-snug text-slate-400">
+              Search the name <span className="font-mono text-slate-200">{serverName}</span>. Players need the
+              SAME map DLCs as the server's world export. Name + password apply from the{" "}
+              <span className="text-slate-300">second</span> start — the config file is seeded on the first boot.
             </p>
           </div>
         ) : lif ? (

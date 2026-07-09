@@ -886,6 +886,83 @@ describe("buildContainerSpec + patchLifWorldXml (LiF:YO / ich777)", () => {
   });
 });
 
+describe("buildContainerSpec + patchAtsServerConfig (ATS / ich777)", () => {
+  it("drives the ich777 wrapper (app id, PUID, both binds, 2 UDP ports, no RCON)", async () => {
+    const { buildContainerSpec } = await import("./runtime-spec");
+    const { ATS_CATALOG } = await import("../catalog/ats.catalog");
+    const spec = buildContainerSpec({
+      serverId: "srv1",
+      game: Game.ATS,
+      map: "ATSWorld",
+      sessionName: "Truck Stop",
+      ports: { game: 27015, rawSocket: 27017, query: 27016, rcon: 0 },
+      maxPlayers: 8,
+      adminPassword: "",
+      serverPassword: "hunter2",
+      modIds: [],
+      cluster: null,
+      config: { values: {} },
+      catalog: ATS_CATALOG,
+    });
+    expect(spec.Image).toBe("ghcr.io/ich777/steamcmd:ats");
+    const env = envOf(spec);
+    expect(env).toContain("GAME_ID=2239530");
+    expect(spec.HostConfig?.PortBindings?.["27015/udp"]).toEqual([{ HostPort: "27015" }]);
+    expect(spec.HostConfig?.PortBindings?.["27016/udp"]).toEqual([{ HostPort: "27016" }]);
+    expect(Object.keys(spec.HostConfig?.PortBindings ?? {}).some((k) => k.endsWith("/tcp"))).toBe(false);
+    const binds = spec.HostConfig?.Binds ?? [];
+    expect(binds.some((b) => b.endsWith(":/serverdata/steamcmd"))).toBe(true);
+    expect(binds.some((b) => b.endsWith(":/serverdata/serverfiles"))).toBe(true);
+  });
+
+  const SAMPLE = `SiiNunit
+{
+server_config : _nameless.1ad.e2c8.f150 {
+ lobby_name: "Docker Server"
+ description: ""
+ welcome_message: ""
+ password: "Docker"
+ max_players: 8
+ max_vehicles_total: 100
+ max_ai_vehicles_player: 50
+ connection_virtual_port: 100
+ query_virtual_port: 101
+ connection_dedicated_port: 27015
+ query_dedicated_port: 27016
+ server_logon_token: ""
+ player_damage: true
+ traffic: true
+ friends_only: false
+ show_server: true
+ moderator_list: 0
+}
+}`;
+
+  it("patches first-class fields + catalog keys, preserving the unit header + unknown keys", async () => {
+    const { patchAtsServerConfig } = await import("./runtime-spec");
+    const { ATS_CATALOG } = await import("../catalog/ats.catalog");
+    const out = patchAtsServerConfig(SAMPLE, {
+      sessionName: 'Truck "Stop"',
+      serverPassword: "hunter2",
+      maxPlayers: 20, // capped to 8
+      gamePort: 27015,
+      queryPort: 27016,
+      catalog: ATS_CATALOG,
+      config: { values: { player_damage: false, max_vehicles_total: 200, welcome_message: "howdy" } },
+    });
+    expect(out).toContain(' lobby_name: "Truck \\"Stop\\""'); // quotes escaped
+    expect(out).toContain(' password: "hunter2"');
+    expect(out).toContain(" max_players: 8");
+    expect(out).toContain(" player_damage: false");
+    expect(out).toContain(" max_vehicles_total: 200");
+    expect(out).toContain(' welcome_message: "howdy"');
+    expect(out).toContain(" traffic: true"); // catalog default applied
+    expect(out).toContain("server_config : _nameless.1ad.e2c8.f150 {"); // unit header untouched
+    expect(out).toContain(" moderator_list: 0"); // unknown key preserved
+    expect(out).toContain(" connection_virtual_port: 100"); // virtual ports untouched
+  });
+});
+
 describe("parsePzModIds", () => {
   it("parses 'Mod ID:' lines from a Workshop description (deduped, in order)", async () => {
     const { parsePzModIds } = await import("../mods/mods.service");

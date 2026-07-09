@@ -41,7 +41,13 @@ import { ManagerSettingsService, SettingKeys } from "../manager-settings/manager
 import { LogCaptureService, LOG_CAPTURE_MAX } from "../logs/log-capture.service";
 import { BackupsService } from "../backups/backups.service";
 import { PlayersService } from "../players/players.service";
-import { buildContainerSpec, renderSdtdServerXml, renderSotfConfig, patchLifWorldXml } from "./runtime-spec";
+import {
+  buildContainerSpec,
+  renderSdtdServerXml,
+  renderSotfConfig,
+  patchLifWorldXml,
+  patchAtsServerConfig,
+} from "./runtime-spec";
 import { portsFor, serverPortSet } from "../catalog/ports";
 import { LocalPaths } from "../common/paths";
 import { containerName } from "../common/naming";
@@ -133,6 +139,10 @@ export const READY_RE_BY_GAME: Record<Game, RegExp> = {
   // and Steam registration follow within seconds). NOT the wrapper's "---Server
   // ready---", which fires BEFORE the wine launch.
   [Game.LIF]: /Server is up and ready to accept connections/i,
+  // ATS: the dedicated server logs its session/Steam registration once joinable.
+  // PROVISIONAL — confirm against a real boot. (NOT the wrapper's "---Server
+  // ready---", which fires BEFORE the game launch.)
+  [Game.ATS]: /Session created|Server is running|Logged on to Steam/i,
 };
 
 /** The "server is now joinable" log-marker regex for a game. */
@@ -1068,7 +1078,8 @@ export class ServersService implements OnApplicationBootstrap {
       game === Game.VRISING ||
       game === Game.SOTF ||
       game === Game.SATISFACTORY ||
-      game === Game.LIF
+      game === Game.LIF ||
+      game === Game.ATS
     )
       return;
     if (!containerId || game === Game.CONAN || game === Game.MINECRAFT || game === Game.ZOMBOID) {
@@ -1299,6 +1310,37 @@ export class ServersService implements OnApplicationBootstrap {
           config: JSON.parse(server.configJson) as ServerConfigValues,
         });
         if (patched !== xml) await writeFile(file, patched, "utf8");
+      }
+      return;
+    }
+
+    // ATS: settings live in server_config.sii inside the game's save dir. The
+    // ich777 image seeds it (with the bundled server_packages world export) on
+    // FIRST boot only — so it can't be pre-written; once present, patch our
+    // lobby name/password/slots/ports + catalog values before every start.
+    if (game === Game.ATS) {
+      const file = join(
+        env.DATA_DIR,
+        "instances",
+        server.id,
+        "serverfiles",
+        ".local",
+        "share",
+        "American Truck Simulator",
+        "server_config.sii",
+      );
+      const sii = await readFile(file, "utf8").catch(() => null);
+      if (sii !== null) {
+        const patched = patchAtsServerConfig(sii, {
+          sessionName: server.name,
+          serverPassword: server.serverPasswordEnc ? this.crypto.decrypt(server.serverPasswordEnc) : "",
+          maxPlayers: server.maxPlayers,
+          gamePort: server.gamePort,
+          queryPort: server.queryPort,
+          catalog: this.catalog.getCatalog(Game.ATS),
+          config: JSON.parse(server.configJson) as ServerConfigValues,
+        });
+        if (patched !== sii) await writeFile(file, patched, "utf8");
       }
       return;
     }

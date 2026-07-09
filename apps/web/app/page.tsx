@@ -23,6 +23,7 @@ import {
   SOTF_OFFICIAL_MAPS,
   SATISFACTORY_OFFICIAL_MAPS,
   LIF_OFFICIAL_MAPS,
+  ATS_OFFICIAL_MAPS,
   GAME_LABELS,
   MAX_PLAYERS_BY_GAME,
   DEFAULT_MAX_PLAYERS_BY_GAME,
@@ -294,6 +295,7 @@ const MAPS_FOR: Record<Game, readonly string[]> = {
   [Game.SOTF]: SOTF_OFFICIAL_MAPS,
   [Game.SATISFACTORY]: SATISFACTORY_OFFICIAL_MAPS,
   [Game.LIF]: LIF_OFFICIAL_MAPS,
+  [Game.ATS]: ATS_OFFICIAL_MAPS,
 };
 
 function CreateServerForm({ onDone }: { onDone: () => void }) {

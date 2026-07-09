@@ -87,6 +87,10 @@ export const LocalPaths = {
         // config dir (world_1.xml). NOTE: a running-server backup of a live MariaDB
         // datadir is crash-consistent only — clean backups happen while stopped.
         return ["serverfiles/.database", "serverfiles/config"];
+      case Game.ATS:
+        // server_config.sii + the server_packages world export + convoy saves all
+        // live in the game's XDG data dir inside the serverfiles bind.
+        return ["serverfiles/.local/share/American Truck Simulator"];
       default:
         return ["ShooterGame/Saved"]; // ASA (POK)
     }

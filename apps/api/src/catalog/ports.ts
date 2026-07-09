@@ -113,6 +113,14 @@ export const SATISFACTORY_PORTS: PortSet = { game: 7777, rawSocket: 8888, query:
 export const LIF_PORTS: PortSet = { game: 28000, rawSocket: 28001, query: 28002, rcon: 0 };
 
 /**
+ * ATS: connection port 27015 + Steam query 27016 (SCS's defaults, set in
+ * server_config.sii). NO RCON (rcon 0, Console UI hidden). rawSocket mirrors
+ * game+1 unused. NOTE: 27015 overlaps Icarus's query port — the start-time
+ * conflict guard prevents running both at once.
+ */
+export const ATS_PORTS: PortSet = { game: 27015, rawSocket: 27017, query: 27016, rcon: 0 };
+
+/**
  * Every host port a server binds (skipping unused 0 slots — e.g. rcon on no-RCON
  * games). Valheim also binds its HTTP status endpoint on game + 3, and Minecraft's
  * query column mirrors the game port (the set dedupes it). Used by the start-time
@@ -201,6 +209,11 @@ export function forwardSpec(game: Game, ports: PortSet): ForwardPort[] {
         { port: ports.query, proto: "tcp", label: "query (tcp)" },
         { port: ports.query, proto: "udp", label: "query (server browser)" },
       ];
+    case Game.ATS:
+      return [
+        { port: ports.game, proto: "udp", label: "connection" },
+        { port: ports.query, proto: "udp", label: "query (server browser)" },
+      ];
     default:
       // ARK family + Conan: game + raw socket + query, all UDP.
       return [
@@ -224,5 +237,6 @@ export function portsFor(game: Game): PortSet {
   if (game === Game.SOTF) return SOTF_PORTS;
   if (game === Game.SATISFACTORY) return SATISFACTORY_PORTS;
   if (game === Game.LIF) return LIF_PORTS;
+  if (game === Game.ATS) return ATS_PORTS;
   return FIXED_PORTS;
 }

@@ -241,6 +241,32 @@ export function ConnectCommand({
     );
   }
 
+  if (game === Game.ATS) {
+    return (
+      <div className={className}>
+        <div className="mb-1 flex items-center gap-1.5 text-xs font-medium text-slate-400">
+          <Terminal className="h-3.5 w-3.5" /> Join a Convoy (in-game)
+        </div>
+        <CopyRow value={`${hostOr}:${gamePort}`} title="Server address for ATS direct search" />
+        <p className="mt-1 text-[11px] leading-snug text-slate-500">
+          In American Truck Simulator: <span className="font-mono">Convoy → search sessions</span> — find the
+          server by name (up to 8 players). Everyone needs the same map DLCs as the server's world export.
+        </p>
+        {joinPassword && (
+          <div className="mt-3">
+            <div className="mb-1 flex items-center gap-1.5 text-xs font-medium text-slate-400">
+              <Lock className="h-3.5 w-3.5" /> Session password
+            </div>
+            <CopyRow value={joinPassword} title="Copy the session password" />
+            <p className="mt-1 text-[11px] leading-snug text-slate-500">
+              Enter this when it prompts. (Applies from the second server start.)
+            </p>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   if (game === Game.LIF) {
     return (
       <div className={className}>
