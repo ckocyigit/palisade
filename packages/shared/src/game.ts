@@ -38,6 +38,8 @@ export enum Game {
   CORE_KEEPER = "CORE_KEEPER",
   /** Terraria — ryshe TShock image (native); we render TShock's config.json; REST API for counts. */
   TERRARIA = "TERRARIA",
+  /** Factorio — factoriotools image (native); server-settings.json + rconpw; full Source RCON. */
+  FACTORIO = "FACTORIO",
 }
 
 /** Friendly game names for the UI. */
@@ -61,6 +63,7 @@ export const GAME_LABELS: Record<Game, string> = {
   [Game.ETS2]: "Euro Truck Simulator 2",
   [Game.CORE_KEEPER]: "Core Keeper",
   [Game.TERRARIA]: "Terraria",
+  [Game.FACTORIO]: "Factorio",
 };
 
 /** SteamCMD app IDs for the dedicated server (anonymous login). */
@@ -101,6 +104,8 @@ export const STEAM_APP_ID: Record<Game, number> = {
   [Game.CORE_KEEPER]: 1963720,
   // Terraria isn't installed via SteamCMD — the ryshe image bakes TShock in. Unused.
   [Game.TERRARIA]: 0,
+  // Factorio isn't on SteamCMD — the factoriotools image bundles the headless server. Unused.
+  [Game.FACTORIO]: 0,
 };
 
 /** Steam Workshop "consumer" app ids for mod downloads (ARK: Survival Evolved /
@@ -147,6 +152,7 @@ export const GAME_ICONS: Record<Game, string> = {
   [Game.ETS2]: "https://cdn.cloudflare.steamstatic.com/steam/apps/227300/header.jpg",
   [Game.CORE_KEEPER]: "https://cdn.cloudflare.steamstatic.com/steam/apps/1621690/header.jpg",
   [Game.TERRARIA]: "https://cdn.cloudflare.steamstatic.com/steam/apps/105600/header.jpg",
+  [Game.FACTORIO]: "https://cdn.cloudflare.steamstatic.com/steam/apps/427520/header.jpg",
 };
 
 /** CurseForge numeric game id for ASA (used by the mod browser). */
@@ -208,6 +214,8 @@ export const RAM_ESTIMATE_MB: Record<Game, number> = {
   [Game.CORE_KEEPER]: 2000,
   // Terraria/TShock is tiny — ~1-1.5 GB even on a large world.
   [Game.TERRARIA]: 1500,
+  // Factorio's headless server: ~2-4 GB on a megabase, far less early on.
+  [Game.FACTORIO]: 3000,
 };
 
 /**
@@ -236,6 +244,7 @@ export const MAX_PLAYERS_BY_GAME: Record<Game, number> = {
   [Game.ETS2]: 8, // same SCS Convoy cap
   [Game.CORE_KEEPER]: 20, // no hard cap; the game is designed for 1-8
   [Game.TERRARIA]: 255, // Terraria's protocol cap
+  [Game.FACTORIO]: 100, // no hard cap (0 = unlimited); a sane ceiling
 };
 
 /** The default player count the create form pre-fills per game (a sensible starting
@@ -260,6 +269,7 @@ export const DEFAULT_MAX_PLAYERS_BY_GAME: Record<Game, number> = {
   [Game.ETS2]: 8,
   [Game.CORE_KEEPER]: 8,
   [Game.TERRARIA]: 8,
+  [Game.FACTORIO]: 10,
 };
 
 /** A password field on the create form: whether to show it at all, its label, an
@@ -321,6 +331,7 @@ export const ADMIN_PASSWORD_META: Record<Game, PasswordFieldMeta> = {
     label: "Admin / REST token (enables live player counts)",
     help: "Palisade talks to TShock's REST API with this token for player counts. Leave empty to disable the REST API.",
   },
+  [Game.FACTORIO]: { show: true, label: "RCON password (enables the console)" },
 };
 
 /** The join (server) password field, per game. Every game can have one, but Valheim
@@ -367,6 +378,7 @@ export const JOIN_PASSWORD_META: Record<Game, PasswordFieldMeta> = {
   // password support), so there's no join-password field.
   [Game.CORE_KEEPER]: { show: false, label: "" },
   [Game.TERRARIA]: { show: true, label: "Server password (players need it to join)" },
+  [Game.FACTORIO]: { show: true, label: "Game password (players need it to join)" },
 };
 
 /** Default port offsets within a per-server allocation block. */
@@ -477,6 +489,18 @@ export const CORE_KEEPER_OFFICIAL_MAPS = ["CKNormal", "CKHard", "CKCreative", "C
  *  a NEW world is created with (autocreate 1/2/3). */
 export const TERRARIA_OFFICIAL_MAPS = ["TerrariaSmall", "TerrariaMedium", "TerrariaLarge"] as const;
 
+/** Factorio maps are procedural — we repurpose the map field as the map-gen PRESET
+ *  a NEW save is generated with (the image's PRESET env). */
+export const FACTORIO_OFFICIAL_MAPS = [
+  "FactorioDefault",
+  "rich-resources",
+  "rail-world",
+  "death-world",
+  "death-world-marathon",
+  "ribbon-world",
+  "island",
+] as const;
+
 /** Friendly display names for known level names (raw level → label). */
 export const MAP_LABELS: Record<string, string> = {
   // Conan Exiles
@@ -522,6 +546,14 @@ export const MAP_LABELS: Record<string, string> = {
   TerrariaSmall: "Small world",
   TerrariaMedium: "Medium world",
   TerrariaLarge: "Large world",
+  // Factorio map-gen presets (repurposed map field; applies to NEW saves)
+  FactorioDefault: "Default",
+  "rich-resources": "Rich resources",
+  "rail-world": "Rail world",
+  "death-world": "Death world",
+  "death-world-marathon": "Death world marathon",
+  "ribbon-world": "Ribbon world",
+  island: "Island",
   // Sons of the Forest game modes (repurposed map field)
   Normal: "Normal (survival)",
   Hard: "Hard (survival)",

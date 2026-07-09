@@ -48,6 +48,7 @@ import {
   patchLifWorldXml,
   patchAtsServerConfig,
   patchTShockConfig,
+  patchFactorioSettings,
 } from "./runtime-spec";
 import { portsFor, serverPortSet } from "../catalog/ports";
 import { LocalPaths } from "../common/paths";
@@ -153,8 +154,11 @@ export const READY_RE_BY_GAME: Record<Game, RegExp> = {
   // succeeds and "Listening on SteamID" precedes this marker.)
   [Game.CORE_KEEPER]: /Started session with info/i,
   // Terraria/TShock prints "Listening on port 7777" (then "Server started") once
-  // the world is loaded and joinable. PROVISIONAL — confirm against a real boot.
+  // the world is loaded and joinable — CONFIRMED live (both lines real).
   [Game.TERRARIA]: /Listening on port|Server started/i,
+  // Factorio logs a state transition to InGame exactly when the map is loaded and
+  // the server takes joins. PROVISIONAL — confirm against a real boot.
+  [Game.FACTORIO]: /changing state from\(CreatingGame\) to\(InGame\)/i,
 };
 
 /** The "server is now joinable" log-marker regex for a game. */
@@ -1153,7 +1157,13 @@ export class ServersService implements OnApplicationBootstrap {
       game === Game.TERRARIA
     )
       return;
-    if (!containerId || game === Game.CONAN || game === Game.MINECRAFT || game === Game.ZOMBOID) {
+    if (
+      !containerId ||
+      game === Game.CONAN ||
+      game === Game.MINECRAFT ||
+      game === Game.ZOMBOID ||
+      game === Game.FACTORIO
+    ) {
       await this.rcon.saveWorld(id).catch(() => undefined);
       return;
     }
@@ -1381,6 +1391,28 @@ export class ServersService implements OnApplicationBootstrap {
           config: JSON.parse(server.configJson) as ServerConfigValues,
         });
         if (patched !== xml) await writeFile(file, patched, "utf8");
+      }
+      return;
+    }
+
+    // Factorio: merge server-settings.json in the config bind (the image seeds the
+    // full example around our keys) and keep config/rconpw in sync with the admin
+    // password — the image only generates a random one when the file is missing.
+    if (game === Game.FACTORIO) {
+      const dir = join(env.DATA_DIR, "instances", server.id, "data", "config");
+      await mkdir(dir, { recursive: true });
+      const file = join(dir, "server-settings.json");
+      const existing = await readFile(file, "utf8").catch(() => null);
+      const patched = patchFactorioSettings(existing, {
+        sessionName: server.name,
+        serverPassword: server.serverPasswordEnc ? this.crypto.decrypt(server.serverPasswordEnc) : "",
+        maxPlayers: server.maxPlayers,
+        catalog: this.catalog.getCatalog(Game.FACTORIO),
+        config: JSON.parse(server.configJson) as ServerConfigValues,
+      });
+      if (patched !== existing) await writeFile(file, patched, "utf8");
+      if (server.adminPasswordEnc) {
+        await writeFile(join(dir, "rconpw"), this.crypto.decrypt(server.adminPasswordEnc), "utf8");
       }
       return;
     }

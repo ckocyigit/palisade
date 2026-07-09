@@ -46,6 +46,7 @@ export function UnofficialListHelp({
   const lif = game === Game.LIF;
   const ats = game === Game.ATS || game === Game.ETS2;
   const terraria = game === Game.TERRARIA;
+  const factorio = game === Game.FACTORIO;
   const passwordHint = hasJoinPassword
     ? "your server has a join password"
     : "ON only if you set a join password";
@@ -64,7 +65,7 @@ export function UnofficialListHelp({
             ? "Add it to your server list"
             : satisfactory
               ? "Add it to your Server Manager"
-            : conan || palworld || icarus || valheim || sdtd || enshrouded || zomboid || vrising || sotf || lif || ats
+            : conan || palworld || icarus || valheim || sdtd || enshrouded || zomboid || vrising || sotf || lif || ats || factorio
               ? "Find it in the in-game server browser"
               : "Find it on the in-game Unofficial list"}
         </span>
@@ -72,7 +73,24 @@ export function UnofficialListHelp({
       </button>
 
       {open &&
-        (terraria ? (
+        (factorio ? (
+          <div className="space-y-1.5 border-t border-ark-border px-2.5 py-2 text-xs">
+            <p className="text-slate-400">
+              In <span className="text-slate-200">Multiplayer</span>:
+            </p>
+            <FilterRow
+              state="on"
+              label="Browse public games — only if public listing + factorio.com credentials are set"
+              hint="off by default; use Connect to address instead"
+            />
+            <FilterRow state={hasJoinPassword ? "on" : "off"} label="Password prompt on join" hint={passwordHint} />
+            <p className="pt-1 leading-snug text-slate-400">
+              Easiest: <span className="text-slate-200">Multiplayer → Connect to address</span> with the
+              address above. The save <span className="font-mono text-slate-200">{serverName}</span> generates
+              on the first start with the chosen map-gen preset.
+            </p>
+          </div>
+        ) : terraria ? (
           <div className="space-y-1.5 border-t border-ark-border px-2.5 py-2 text-xs">
             <p className="text-slate-400">
               Terraria has no public browser — players join by IP:

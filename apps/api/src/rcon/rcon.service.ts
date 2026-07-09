@@ -133,6 +133,7 @@ export class RconService {
     if (game === Game.SEVEN_DAYS) return this.exec(serverId, `say "${message}"`);
     if (game === Game.ZOMBOID) return this.exec(serverId, `servermsg "${message}"`);
     if (game === Game.VRISING) return this.exec(serverId, `announce ${message}`);
+    if (game === Game.FACTORIO) return this.exec(serverId, message); // bare text = chat
     return this.exec(serverId, `ServerChat ${message}`);
   }
 
@@ -145,6 +146,7 @@ export class RconService {
     if (game === Game.MINECRAFT) return this.exec(serverId, "save-all");
     if (game === Game.SEVEN_DAYS) return this.exec(serverId, "saveworld");
     if (game === Game.ZOMBOID) return this.exec(serverId, "save");
+    if (game === Game.FACTORIO) return this.exec(serverId, "/server-save");
     if (game === Game.VRISING)
       return "V Rising autosaves on an interval and flushes on shutdown — no manual save command.";
     return this.exec(serverId, "SaveWorld");
@@ -182,6 +184,15 @@ export class RconService {
         .map((l) => l.split(",")[0]?.trim())
         .filter((n): n is string => Boolean(n));
     }
+    // Factorio `/players online` → "Online players (N):" then "  name (online)" lines.
+    if (game === Game.FACTORIO) {
+      const out = await this.exec(serverId, "/players online");
+      return out
+        .split("\n")
+        .slice(1)
+        .map((l) => l.replace(/\(online\)/i, "").trim())
+        .filter(Boolean);
+    }
     // Zomboid `players` → "Players connected (N):" then one "-name" line each.
     if (game === Game.ZOMBOID) {
       const out = await this.exec(serverId, "players");
@@ -203,6 +214,7 @@ export class RconService {
     const game = await this.gameOf(serverId);
     if (game === Game.SEVEN_DAYS) return this.exec(serverId, `kick "${playerId}"`);
     if (game === Game.ZOMBOID) return this.exec(serverId, `kickuser "${playerId}"`);
+    if (game === Game.FACTORIO) return this.exec(serverId, `/kick ${playerId}`);
     if (game === Game.MINECRAFT) return this.exec(serverId, `kick ${playerId}`);
     return this.exec(serverId, `KickPlayer ${playerId}`);
   }
@@ -212,6 +224,7 @@ export class RconService {
     const game = await this.gameOf(serverId);
     if (game === Game.SEVEN_DAYS) return this.exec(serverId, `ban add "${playerId}" 365 days "banned"`);
     if (game === Game.ZOMBOID) return this.exec(serverId, `banuser "${playerId}"`);
+    if (game === Game.FACTORIO) return this.exec(serverId, `/ban ${playerId}`);
     if (game === Game.MINECRAFT) return this.exec(serverId, `ban ${playerId}`);
     return this.exec(serverId, `BanPlayer ${playerId}`);
   }

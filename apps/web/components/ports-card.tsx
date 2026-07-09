@@ -17,6 +17,7 @@ const HAS_RCON_PORT = new Set<Game>([
   Game.MINECRAFT,
   Game.SEVEN_DAYS,
   Game.VRISING,
+  Game.FACTORIO,
 ]);
 
 /** Edit a stopped server's ports (the container bindings + configs re-render on the

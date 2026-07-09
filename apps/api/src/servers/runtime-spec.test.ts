@@ -1111,6 +1111,83 @@ describe("buildContainerSpec + patchTShockConfig (Terraria / ryshe)", () => {
   });
 });
 
+describe("buildContainerSpec + patchFactorioSettings (Factorio / factoriotools)", () => {
+  it("maps preset/save envs, PUID, and publishes game udp + rcon tcp", async () => {
+    const { buildContainerSpec } = await import("./runtime-spec");
+    const { FACTORIO_CATALOG } = await import("../catalog/factorio.catalog");
+    const spec = buildContainerSpec({
+      serverId: "srv1",
+      game: Game.FACTORIO,
+      map: "rail-world",
+      sessionName: "The Factory",
+      ports: { game: 34197, rawSocket: 34198, query: 34197, rcon: 27015 },
+      maxPlayers: 10,
+      adminPassword: "rconpw",
+      serverPassword: "hunter2",
+      modIds: [],
+      cluster: null,
+      config: { values: { UPDATE_MODS_ON_START: true } },
+      catalog: FACTORIO_CATALOG,
+    });
+    expect(spec.Image).toBe("factoriotools/factorio:stable");
+    const env = envOf(spec);
+    expect(env).toContain("SAVE_NAME=world");
+    expect(env).toContain("GENERATE_NEW_SAVE=true");
+    expect(env).toContain("PRESET=rail-world");
+    expect(env).toContain("UPDATE_MODS_ON_START=true"); // env-key catalog setting
+    expect(env.some((e) => e.startsWith("visibility"))).toBe(false); // JSON keys stay out of env
+    expect(spec.HostConfig?.PortBindings?.["34197/udp"]).toEqual([{ HostPort: "34197" }]);
+    expect(spec.HostConfig?.PortBindings?.["27015/tcp"]).toEqual([{ HostPort: "27015" }]);
+    expect((spec.HostConfig?.Binds ?? []).some((b) => b.endsWith(":/factorio"))).toBe(true);
+  });
+
+  it("omits PRESET for the default map", async () => {
+    const { buildContainerSpec } = await import("./runtime-spec");
+    const { FACTORIO_CATALOG } = await import("../catalog/factorio.catalog");
+    const spec = buildContainerSpec({
+      serverId: "srv1",
+      game: Game.FACTORIO,
+      map: "FactorioDefault",
+      sessionName: "Plain",
+      ports: { game: 34197, rawSocket: 34198, query: 34197, rcon: 27015 },
+      maxPlayers: 10,
+      adminPassword: "",
+      serverPassword: null,
+      modIds: [],
+      cluster: null,
+      config: { values: {} },
+      catalog: FACTORIO_CATALOG,
+    });
+    expect(envOf(spec).some((e) => e.startsWith("PRESET="))).toBe(false);
+  });
+
+  it("patchFactorioSettings merges + nests dotted visibility keys, preserving others", async () => {
+    const { patchFactorioSettings } = await import("./runtime-spec");
+    const { FACTORIO_CATALOG } = await import("../catalog/factorio.catalog");
+    const existing = JSON.stringify({
+      name: "old",
+      max_upload_in_kilobytes_per_second: 0,
+      visibility: { public: true, lan: false },
+    });
+    const out = JSON.parse(
+      patchFactorioSettings(existing, {
+        sessionName: "The Factory",
+        serverPassword: "hunter2",
+        maxPlayers: 10,
+        catalog: FACTORIO_CATALOG,
+        config: { values: { "visibility.public": false, autosave_interval: 5 } },
+      }),
+    ) as Record<string, unknown>;
+    expect(out.name).toBe("The Factory");
+    expect(out.game_password).toBe("hunter2");
+    expect(out.max_players).toBe(10);
+    expect(out.visibility).toEqual({ public: false, lan: true }); // dotted keys nested
+    expect(out.autosave_interval).toBe(5);
+    expect(out.max_upload_in_kilobytes_per_second).toBe(0); // untouched key preserved
+    expect(out.UPDATE_MODS_ON_START).toBeUndefined(); // env keys stay out of the JSON
+  });
+});
+
 describe("parsePzModIds", () => {
   it("parses 'Mod ID:' lines from a Workshop description (deduped, in order)", async () => {
     const { parsePzModIds } = await import("../mods/mods.service");

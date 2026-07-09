@@ -75,6 +75,11 @@ export const IMAGES: Record<Game, string> = {
   // (CONFIGPATH), rendered by the manager; its REST API (7878) powers player
   // counts. Console is stdin-only (hidden); world args pass through the entrypoint.
   [Game.TERRARIA]: "ryshe/terraria:latest",
+  // factoriotools/factorio — the canonical Factorio image; the headless server is
+  // baked in (stable tag). One /factorio volume (saves/config/mods). PUID/PGID
+  // supported natively; RCON password comes from config/rconpw; server-settings
+  // .json is merge-patched by the manager. Full Source RCON console.
+  [Game.FACTORIO]: "factoriotools/factorio:stable",
 };
 
 /** POK keeps all instance data (install + saves + config) under this path. */
@@ -157,6 +162,9 @@ export const TERRARIA_WORLDS_DIR = "/root/.local/share/Terraria/Worlds";
 export const TERRARIA_PLUGINS_DIR = "/tshock/ServerPlugins";
 export const TERRARIA_LOGS_DIR = "/tshock/logs";
 
+/** Factorio (factoriotools): one volume holds saves/, config/, mods/, scenarios/. */
+export const FACTORIO_DATA_DIR = "/factorio";
+
 /**
  * The uid/gid each image runs the server as. Neither chowns its mounts fully
  * (POK never does; hermsi only chowns the volume root), so the manager makes the
@@ -182,6 +190,7 @@ export const SERVER_UID: Record<Game, number> = {
   [Game.ETS2]: 99,
   [Game.CORE_KEEPER]: 1000, // escaping's steam user, remapped via PUID/PGID (we pass ours)
   [Game.TERRARIA]: 0, // the ryshe image runs as root
+  [Game.FACTORIO]: 845, // the image's "factorio" user, remapped via PUID/PGID (we pass ours)
 };
 export const SERVER_GID: Record<Game, number> = {
   [Game.ASA]: 7777,
@@ -203,4 +212,5 @@ export const SERVER_GID: Record<Game, number> = {
   [Game.ETS2]: 100,
   [Game.CORE_KEEPER]: 1000,
   [Game.TERRARIA]: 0,
+  [Game.FACTORIO]: 845,
 };

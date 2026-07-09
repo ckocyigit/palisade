@@ -145,6 +145,13 @@ export const CORE_KEEPER_PORTS: PortSet = { game: 0, rawSocket: 0, query: 0, rco
 export const TERRARIA_PORTS: PortSet = { game: 7777, rawSocket: 7779, query: 7777, rcon: 7979 };
 
 /**
+ * Factorio: the canonical game port 34197 (UDP) + Source RCON on 27015 TCP.
+ * query mirrors the game port; rawSocket unused. NOTE: 27015 overlaps Icarus's
+ * query, PZ's RCON, and ATS's connection port — the conflict guard covers it.
+ */
+export const FACTORIO_PORTS: PortSet = { game: 34197, rawSocket: 34198, query: 34197, rcon: 27015 };
+
+/**
  * Every host port a server binds (skipping unused 0 slots — e.g. rcon on no-RCON
  * games). Valheim also binds its HTTP status endpoint on game + 3, and Minecraft's
  * query column mirrors the game port (the set dedupes it). Used by the start-time
@@ -243,6 +250,8 @@ export function forwardSpec(game: Game, ports: PortSet): ForwardPort[] {
       return []; // Steam relay — nothing to forward
     case Game.TERRARIA:
       return [{ port: ports.game, proto: "tcp", label: "game" }]; // REST stays LAN-only
+    case Game.FACTORIO:
+      return [{ port: ports.game, proto: "udp", label: "game" }]; // RCON stays LAN-only
     default:
       // ARK family + Conan: game + raw socket + query, all UDP.
       return [
@@ -270,5 +279,6 @@ export function portsFor(game: Game): PortSet {
   if (game === Game.ETS2) return ETS2_PORTS;
   if (game === Game.CORE_KEEPER) return CORE_KEEPER_PORTS;
   if (game === Game.TERRARIA) return TERRARIA_PORTS;
+  if (game === Game.FACTORIO) return FACTORIO_PORTS;
   return FIXED_PORTS;
 }

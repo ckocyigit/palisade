@@ -292,6 +292,30 @@ export function ConnectCommand({
     );
   }
 
+  if (game === Game.FACTORIO) {
+    return (
+      <div className={className}>
+        <div className="mb-1 flex items-center gap-1.5 text-xs font-medium text-slate-400">
+          <Terminal className="h-3.5 w-3.5" /> Connect to address (in-game)
+        </div>
+        <CopyRow value={`${hostOr}:${gamePort}`} title="Address for Factorio's Connect to address" />
+        <p className="mt-1 text-[11px] leading-snug text-slate-500">
+          In Factorio: <span className="font-mono">Multiplayer → Connect to address</span>, paste this. Online,
+          friends use your public IP with the same port.
+        </p>
+        {joinPassword && (
+          <div className="mt-3">
+            <div className="mb-1 flex items-center gap-1.5 text-xs font-medium text-slate-400">
+              <Lock className="h-3.5 w-3.5" /> Game password
+            </div>
+            <CopyRow value={joinPassword} title="Copy the game password" />
+            <p className="mt-1 text-[11px] leading-snug text-slate-500">Enter this when it prompts.</p>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   if (game === Game.TERRARIA) {
     return (
       <div className={className}>

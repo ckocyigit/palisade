@@ -40,6 +40,7 @@ const RCON_POLL_GAMES = new Set<Game>([
   Game.MINECRAFT,
   Game.SEVEN_DAYS,
   Game.ZOMBOID,
+  Game.FACTORIO,
 ]);
 
 const ACTIONS_BY_GAME: Record<Game, PlayerAction[]> = {
@@ -62,6 +63,7 @@ const ACTIONS_BY_GAME: Record<Game, PlayerAction[]> = {
   [Game.ETS2]: [],
   [Game.CORE_KEEPER]: [], // no console; joins are gated by the secret Game ID
   [Game.TERRARIA]: [], // stdin console only; capture-only from join log lines
+  [Game.FACTORIO]: ["kick", "ban", "whitelist", "admin"], // /kick /ban /whitelist add /promote
 };
 
 const CAPTURE_NOTES: Partial<Record<Game, string>> = {
@@ -139,8 +141,8 @@ export class SightingsService implements OnModuleInit {
       }
       return players;
     }
-    if (game === Game.MINECRAFT || game === Game.ZOMBOID) {
-      // Zomboid's `players` output is name-only ("-name" lines) — no platform id.
+    if (game === Game.MINECRAFT || game === Game.ZOMBOID || game === Game.FACTORIO) {
+      // Zomboid's `players` / Factorio's `/players online` outputs are name-only.
       const names = await this.rcon.listPlayers(serverId);
       return names.map((name) => ({ name }));
     }
@@ -306,6 +308,14 @@ export class SightingsService implements OnModuleInit {
     if (game === Game.ZOMBOID && action === "admin") {
       await this.rcon.exec(serverId, `setaccesslevel "${name}" admin`);
       return { ok: true, detail: `${name} is now an admin` };
+    }
+    if (game === Game.FACTORIO && action === "whitelist") {
+      await this.rcon.exec(serverId, `/whitelist add ${name}`);
+      return { ok: true, detail: `${name} whitelisted` };
+    }
+    if (game === Game.FACTORIO && action === "admin") {
+      await this.rcon.exec(serverId, `/promote ${name}`);
+      return { ok: true, detail: `${name} promoted to admin` };
     }
     throw new BadRequestException(`${action} isn't supported for this game`);
   }

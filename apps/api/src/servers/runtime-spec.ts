@@ -39,12 +39,14 @@ import {
   TERRARIA_WORLDS_DIR,
   TERRARIA_PLUGINS_DIR,
   TERRARIA_LOGS_DIR,
+  FACTORIO_DATA_DIR,
 } from "../common/images";
 // (ATS reuses the ich777 wrapper mount points LIF_STEAMCMD_DIR / LIF_SERVERFILES_DIR.)
 import { ZOMBOID_STEAM_PORTS } from "../catalog/ports";
 import { SOTF_GAME_SETTINGS_KEYS } from "../catalog/sotf.catalog";
 import { LIF_SKILLCAP_GROUPS } from "../catalog/lif.catalog";
 import { TERRARIA_CLI_KEYS } from "../catalog/terraria.catalog";
+import { FACTORIO_ENV_KEYS } from "../catalog/factorio.catalog";
 import { ARK_NETWORK, containerName } from "../common/naming";
 import { loadEnv } from "../config/env";
 
@@ -91,6 +93,7 @@ export function buildContainerSpec(input: RuntimeSpecInput): Docker.ContainerCre
   if (input.game === Game.ATS || input.game === Game.ETS2) return buildAtsSpec(input);
   if (input.game === Game.CORE_KEEPER) return buildCoreKeeperSpec(input);
   if (input.game === Game.TERRARIA) return buildTerrariaSpec(input);
+  if (input.game === Game.FACTORIO) return buildFactorioSpec(input);
   return buildAseSpec(input);
 }
 
@@ -1448,6 +1451,114 @@ function buildLifSpec(input: RuntimeSpecInput): Docker.ContainerCreateOptions {
 }
 
 const STEAM_APP_ID_LIF = 320850;
+
+/**
+ * Factorio — drive the canonical factoriotools image. The headless server is
+ * baked in; one /factorio volume holds saves/config/mods. The map field carries
+ * the map-gen PRESET for the save generated on first boot (GENERATE_NEW_SAVE
+ * skips when the save already exists; LOAD_LATEST_SAVE then resumes the newest
+ * autosave). PUID/PGID are honoured natively. RCON (Source) reads its password
+ * from config/rconpw, which writeInis keeps in sync with the admin password.
+ */
+function buildFactorioSpec(input: RuntimeSpecInput): Docker.ContainerCreateOptions {
+  const env = loadEnv();
+  const { ports } = input;
+
+  const factorioEnv = [
+    `TZ=${input.timezone || env.TZ}`,
+    `PUID=${env.PUID}`,
+    `PGID=${env.PGID}`,
+    `SAVE_NAME=world`,
+    `GENERATE_NEW_SAVE=true`, // no-op once world.zip exists
+    `LOAD_LATEST_SAVE=true`, // resume the newest (auto)save on later boots
+    `PORT=${ports.game}`,
+    `RCON_PORT=${ports.rcon}`,
+  ];
+  if (input.map !== "FactorioDefault") factorioEnv.push(`PRESET=${input.map}`);
+  for (const def of input.catalog.settings) {
+    if (!FACTORIO_ENV_KEYS.has(def.key)) continue;
+    const raw = input.config.values?.[def.key] ?? def.default;
+    if (raw === undefined || raw === null || raw === "") continue;
+    factorioEnv.push(`${def.key}=${typeof raw === "boolean" ? (raw ? "true" : "false") : String(raw)}`);
+  }
+
+  const binds = [`${HostPaths.instanceRoot(input.serverId)}/data:${FACTORIO_DATA_DIR}`];
+
+  const hostNet = env.GAME_HOST_NETWORK;
+  return {
+    name: containerName(input.serverId, input.game, input.sessionName),
+    Image: IMAGES[Game.FACTORIO],
+    Hostname: containerName(input.serverId, input.game, input.sessionName),
+    Env: factorioEnv,
+    Labels: serverLabels(input, env.PUBLIC_BASE_URL),
+    ...(hostNet
+      ? {}
+      : {
+          ExposedPorts: {
+            [portKey(ports.game, "udp")]: {},
+            [portKey(ports.rcon, "tcp")]: {},
+          },
+        }),
+    HostConfig: {
+      Binds: binds,
+      ...(hostNet
+        ? { NetworkMode: "host" }
+        : {
+            PortBindings: {
+              [portKey(ports.game, "udp")]: [{ HostPort: String(ports.game) }],
+              [portKey(ports.rcon, "tcp")]: [{ HostPort: String(ports.rcon) }],
+            },
+          }),
+      RestartPolicy: { Name: "no" }, // manager watchdog owns restarts
+      Memory: input.ramLimitMb ? input.ramLimitMb * 1024 * 1024 : undefined,
+      NanoCpus: input.cpuLimit ? Math.round(input.cpuLimit * 1e9) : undefined,
+    },
+    ...(hostNet ? {} : { NetworkingConfig: { EndpointsConfig: { [ARK_NETWORK]: {} } } }),
+  };
+}
+
+/**
+ * Merge Palisade's first-class fields + catalog keys into Factorio's
+ * server-settings.json, preserving everything else (the image seeds the full
+ * example file; users may hand-tune other keys). Dotted catalog keys
+ * ("visibility.public") nest one level. `existing` is the current file text or
+ * null before the first boot.
+ */
+export function patchFactorioSettings(
+  existing: string | null,
+  input: {
+    sessionName: string;
+    serverPassword: string;
+    maxPlayers: number;
+    catalog: SettingsCatalog;
+    config: ServerConfigValues;
+  },
+): string {
+  let doc: Record<string, unknown>;
+  try {
+    doc = existing ? (JSON.parse(existing) as Record<string, unknown>) : {};
+  } catch {
+    doc = {};
+  }
+  doc.name = input.sessionName;
+  doc.game_password = input.serverPassword;
+  doc.max_players = Math.max(0, Math.min(input.maxPlayers, 65535));
+  for (const def of input.catalog.settings) {
+    if (FACTORIO_ENV_KEYS.has(def.key)) continue; // image env vars, not settings keys
+    const raw = input.config.values?.[def.key] ?? def.default;
+    if (raw === undefined || raw === null) continue;
+    const dot = def.key.indexOf(".");
+    if (dot > 0) {
+      const parentKey = def.key.slice(0, dot);
+      const child = def.key.slice(dot + 1);
+      const parent = (doc[parentKey] ??= {}) as Record<string, unknown>;
+      parent[child] = raw;
+    } else {
+      doc[def.emitAs ?? def.key] = raw;
+    }
+  }
+  return JSON.stringify(doc, null, 2);
+}
 
 /** The repurposed map field -> Terraria's -autocreate world size (1/2/3). */
 const TERRARIA_WORLD_SIZES: Record<string, number> = {

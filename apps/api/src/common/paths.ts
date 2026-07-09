@@ -100,6 +100,9 @@ export const LocalPaths = {
       case Game.TERRARIA:
         // Worlds + TShock's config.json share one bind; plugins are user content.
         return ["worlds", "plugins"];
+      case Game.FACTORIO:
+        // saves (incl. autosaves) + the settings JSONs/rconpw + mods.
+        return ["data/saves", "data/config", "data/mods"];
       default:
         return ["ShooterGame/Saved"]; // ASA (POK)
     }
