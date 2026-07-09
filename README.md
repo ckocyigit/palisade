@@ -219,6 +219,30 @@ Monorepo layout: `packages/shared` (types + settings catalogs contract),
 `apps/api` (NestJS orchestrator), `apps/web` (Next.js UI), `docker/` (manager
 entrypoint), `unraid/` (CA template).
 
+## Acknowledgements
+
+This manager is a control plane — the actual game servers run on excellent
+community-maintained images. Huge thanks to their maintainers; this project
+wouldn't exist without them:
+
+| Game(s) | Image | Maintainer / project |
+|---|---|---|
+| ARK: Survival Ascended | `acekorneya/asa_server` | [Acekorneya (POK)](https://github.com/Acekorneya/Ark-Survival-Ascended-Server) |
+| Conan Exiles | `acekorneya/conan_enhanced_server` | [Acekorneya (POK)](https://github.com/Acekorneya/POK_Conan_Enhanced_Docker_server) |
+| ARK: Survival Evolved | `hermsi/ark-server` | [Hermsi1337](https://github.com/Hermsi1337/docker-ark-server) |
+| Palworld | `thijsvanloef/palworld-server-docker` | [Thijs van Loef](https://github.com/thijsvanloef/palworld-server-docker) |
+| Minecraft (Java) | `itzg/minecraft-server` | [itzg (Geoff Bourne)](https://github.com/itzg/docker-minecraft-server) |
+| Minecraft Bedrock | `itzg/minecraft-bedrock-server` | [itzg (Geoff Bourne)](https://github.com/itzg/docker-minecraft-bedrock-server) |
+| Icarus | `mornedhels/icarus-server` | [mornedhels](https://github.com/mornedhels/icarus-server) |
+| Enshrouded | `mornedhels/enshrouded-server` | [mornedhels](https://github.com/mornedhels/enshrouded-server) |
+| Valheim | `lloesche/valheim-server` | [lloesche / community-valheim-tools](https://github.com/community-valheim-tools/valheim-server-docker) |
+| 7 Days to Die | `vinanrra/7dtd-server` | [vinanrra](https://github.com/vinanrra/Docker-7DaysToDie) (built on [LinuxGSM](https://linuxgsm.com/)) |
+
+Also standing on: [SteamCMD](https://developer.valvesoftware.com/wiki/SteamCMD),
+GE-Proton/Wine for the Windows-only servers,
+[Thunderstore](https://thunderstore.io/) (Valheim mod index), and the
+[CurseForge](https://www.curseforge.com/) + Steam Web APIs for mod browsing.
+
 ## License
 
 [MIT](LICENSE) © 2026 Jacob Neudorf. Not affiliated with Studio Wildcard,

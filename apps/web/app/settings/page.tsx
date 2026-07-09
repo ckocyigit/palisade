@@ -241,6 +241,48 @@ export default function SettingsPage() {
       <button className="btn-primary" onClick={save} disabled={busy}>
         <Save className="h-4 w-4" /> {busy ? "Saving…" : saved ? "Saved ✓" : "Save settings"}
       </button>
+
+      <CreditsCard />
+    </div>
+  );
+}
+
+/** The community images doing the actual heavy lifting — one server at a time. */
+const IMAGE_CREDITS: { game: string; maintainer: string; url: string }[] = [
+  { game: "ARK: Survival Ascended", maintainer: "Acekorneya (POK)", url: "https://github.com/Acekorneya/Ark-Survival-Ascended-Server" },
+  { game: "Conan Exiles", maintainer: "Acekorneya (POK)", url: "https://github.com/Acekorneya/POK_Conan_Enhanced_Docker_server" },
+  { game: "ARK: Survival Evolved", maintainer: "Hermsi1337", url: "https://github.com/Hermsi1337/docker-ark-server" },
+  { game: "Palworld", maintainer: "Thijs van Loef", url: "https://github.com/thijsvanloef/palworld-server-docker" },
+  { game: "Minecraft (Java)", maintainer: "itzg", url: "https://github.com/itzg/docker-minecraft-server" },
+  { game: "Minecraft Bedrock", maintainer: "itzg", url: "https://github.com/itzg/docker-minecraft-bedrock-server" },
+  { game: "Icarus", maintainer: "mornedhels", url: "https://github.com/mornedhels/icarus-server" },
+  { game: "Enshrouded", maintainer: "mornedhels", url: "https://github.com/mornedhels/enshrouded-server" },
+  { game: "Valheim", maintainer: "lloesche / community-valheim-tools", url: "https://github.com/community-valheim-tools/valheim-server-docker" },
+  { game: "7 Days to Die", maintainer: "vinanrra (LinuxGSM)", url: "https://github.com/vinanrra/Docker-7DaysToDie" },
+];
+
+function CreditsCard() {
+  return (
+    <div className="card space-y-3">
+      <h2 className="text-sm font-semibold uppercase tracking-wide text-ark-accent2">About</h2>
+      <p className="text-xs leading-snug text-slate-400">
+        This manager is only the control plane — every game server runs on a
+        community-maintained Docker image. Huge thanks to the maintainers who do the real heavy
+        lifting:
+      </p>
+      <ul className="grid gap-x-6 gap-y-1 text-xs sm:grid-cols-2">
+        {IMAGE_CREDITS.map((c) => (
+          <li key={c.url + c.game} className="flex justify-between gap-3">
+            <span className="text-slate-400">{c.game}</span>
+            <a href={c.url} target="_blank" rel="noreferrer" className="text-ark-accent hover:underline">
+              {c.maintainer}
+            </a>
+          </li>
+        ))}
+      </ul>
+      <p className="text-[11px] text-slate-500">
+        Plus SteamCMD, GE-Proton/Wine, <a href="https://thunderstore.io/" target="_blank" rel="noreferrer" className="text-ark-accent hover:underline">Thunderstore</a>, and the CurseForge + Steam Web APIs for mod browsing.
+      </p>
     </div>
   );
 }
