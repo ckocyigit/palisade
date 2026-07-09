@@ -23,6 +23,7 @@ import {
   ATS_OFFICIAL_MAPS,
   ETS2_OFFICIAL_MAPS,
   CORE_KEEPER_OFFICIAL_MAPS,
+  TERRARIA_OFFICIAL_MAPS,
   mapLabel,
   type ServerSummary,
 } from "@ark/shared";
@@ -47,6 +48,7 @@ const MAPS_FOR: Record<Game, readonly string[]> = {
   [Game.ATS]: ATS_OFFICIAL_MAPS,
   [Game.ETS2]: ETS2_OFFICIAL_MAPS,
   [Game.CORE_KEEPER]: CORE_KEEPER_OFFICIAL_MAPS,
+  [Game.TERRARIA]: TERRARIA_OFFICIAL_MAPS,
 };
 
 /**

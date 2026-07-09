@@ -111,6 +111,26 @@ export class PlayersService {
         const count = await raknetPing(host, server.gamePort);
         return { online: count.online, max: count.max ?? server.maxPlayers };
       }
+      if (game === Game.TERRARIA) {
+        // TShock's REST API (enabled iff an admin token is set). /v2/server/status
+        // returns playercount + maxplayers as JSON.
+        if (!server.adminPasswordEnc) return null;
+        const token = this.crypto.decrypt(server.adminPasswordEnc);
+        const controller = new AbortController();
+        const t = setTimeout(() => controller.abort(), 2500);
+        try {
+          const res = await fetch(
+            `http://${host}:${server.rconPort}/v2/server/status?token=${encodeURIComponent(token)}`,
+            { signal: controller.signal },
+          );
+          if (!res.ok) return null;
+          const j = (await res.json()) as { playercount?: number; maxplayers?: number };
+          if (j.playercount === undefined) return null;
+          return { online: j.playercount, max: j.maxplayers ?? server.maxPlayers };
+        } finally {
+          clearTimeout(t);
+        }
+      }
       if (game === Game.SATISFACTORY) {
         // The game's HTTPS API on the game port (no A2S). Passwordless Client
         // login unless a join password forces the admin-password fallback.

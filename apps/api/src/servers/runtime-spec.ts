@@ -36,11 +36,15 @@ import {
   LIF_SERVERFILES_DIR,
   CORE_KEEPER_FILES_DIR,
   CORE_KEEPER_DATA_DIR,
+  TERRARIA_WORLDS_DIR,
+  TERRARIA_PLUGINS_DIR,
+  TERRARIA_LOGS_DIR,
 } from "../common/images";
 // (ATS reuses the ich777 wrapper mount points LIF_STEAMCMD_DIR / LIF_SERVERFILES_DIR.)
 import { ZOMBOID_STEAM_PORTS } from "../catalog/ports";
 import { SOTF_GAME_SETTINGS_KEYS } from "../catalog/sotf.catalog";
 import { LIF_SKILLCAP_GROUPS } from "../catalog/lif.catalog";
+import { TERRARIA_CLI_KEYS } from "../catalog/terraria.catalog";
 import { ARK_NETWORK, containerName } from "../common/naming";
 import { loadEnv } from "../config/env";
 
@@ -86,6 +90,7 @@ export function buildContainerSpec(input: RuntimeSpecInput): Docker.ContainerCre
   if (input.game === Game.LIF) return buildLifSpec(input);
   if (input.game === Game.ATS || input.game === Game.ETS2) return buildAtsSpec(input);
   if (input.game === Game.CORE_KEEPER) return buildCoreKeeperSpec(input);
+  if (input.game === Game.TERRARIA) return buildTerrariaSpec(input);
   return buildAseSpec(input);
 }
 
@@ -1443,6 +1448,125 @@ function buildLifSpec(input: RuntimeSpecInput): Docker.ContainerCreateOptions {
 }
 
 const STEAM_APP_ID_LIF = 320850;
+
+/** The repurposed map field -> Terraria's -autocreate world size (1/2/3). */
+const TERRARIA_WORLD_SIZES: Record<string, number> = {
+  TerrariaSmall: 1,
+  TerrariaMedium: 2,
+  TerrariaLarge: 3,
+};
+
+/**
+ * Terraria — drive the ryshe TShock image. TShock is baked in (nothing installs
+ * on boot); the entrypoint passes container args through to TShock.Server, and
+ * WORLD_FILENAME + -autocreate make it create-or-load the world. TShock's own
+ * settings live in config.json INSIDE the worlds bind (CONFIGPATH), rendered by
+ * patchTShockConfig before each start; its REST API (published on the rcon slot,
+ * LAN-only) powers player counts. The in-game console is stdin-only (hidden).
+ */
+function buildTerrariaSpec(input: RuntimeSpecInput): Docker.ContainerCreateOptions {
+  const env = loadEnv();
+  const { ports } = input;
+
+  const args = [
+    "-autocreate",
+    String(TERRARIA_WORLD_SIZES[input.map] ?? 2),
+    "-worldname",
+    input.sessionName,
+  ];
+  for (const def of input.catalog.settings) {
+    const flag = TERRARIA_CLI_KEYS[def.key];
+    if (!flag) continue;
+    const raw = input.config.values?.[def.key] ?? def.default;
+    if (raw === undefined || raw === null || raw === "") continue;
+    args.push(flag, String(raw));
+  }
+
+  const root = HostPaths.instanceRoot(input.serverId);
+  const binds = [
+    `${root}/worlds:${TERRARIA_WORLDS_DIR}`, // world + TShock config.json
+    `${root}/plugins:${TERRARIA_PLUGINS_DIR}`,
+    `${root}/logs:${TERRARIA_LOGS_DIR}`,
+  ];
+
+  const hostNet = env.GAME_HOST_NETWORK;
+  return {
+    name: containerName(input.serverId, input.game, input.sessionName),
+    Image: IMAGES[Game.TERRARIA],
+    Hostname: containerName(input.serverId, input.game, input.sessionName),
+    Env: [`TZ=${input.timezone || env.TZ}`, `WORLD_FILENAME=world.wld`],
+    Cmd: args,
+    Labels: serverLabels(input, env.PUBLIC_BASE_URL),
+    ...(hostNet
+      ? {}
+      : {
+          ExposedPorts: {
+            [portKey(ports.game, "tcp")]: {},
+            [portKey(ports.rcon, "tcp")]: {}, // TShock REST (player counts)
+          },
+        }),
+    HostConfig: {
+      Binds: binds,
+      ...(hostNet
+        ? { NetworkMode: "host" }
+        : {
+            PortBindings: {
+              [portKey(ports.game, "tcp")]: [{ HostPort: String(ports.game) }],
+              [portKey(ports.rcon, "tcp")]: [{ HostPort: String(ports.rcon) }],
+            },
+          }),
+      RestartPolicy: { Name: "no" }, // manager watchdog owns restarts
+      Memory: input.ramLimitMb ? input.ramLimitMb * 1024 * 1024 : undefined,
+      NanoCpus: input.cpuLimit ? Math.round(input.cpuLimit * 1e9) : undefined,
+    },
+    ...(hostNet ? {} : { NetworkingConfig: { EndpointsConfig: { [ARK_NETWORK]: {} } } }),
+  };
+}
+
+/**
+ * Merge Palisade's first-class fields + catalog keys into TShock's config.json
+ * (Settings object), preserving whatever else TShock has written there — it
+ * rewrites the file with its full defaults on every boot. `existing` is the
+ * current file text or null on first boot. The REST API is enabled exactly when
+ * an admin token is set; the token doubles as the API credential.
+ */
+export function patchTShockConfig(
+  existing: string | null,
+  input: {
+    sessionName: string;
+    serverPassword: string;
+    adminPassword: string;
+    maxPlayers: number;
+    gamePort: number;
+    restPort: number;
+    catalog: SettingsCatalog;
+    config: ServerConfigValues;
+  },
+): string {
+  let doc: { Settings?: Record<string, unknown> };
+  try {
+    doc = existing ? (JSON.parse(existing) as typeof doc) : {};
+  } catch {
+    doc = {}; // corrupt file — TShock refills defaults around our keys
+  }
+  const settings = (doc.Settings ??= {});
+  settings.ServerName = input.sessionName;
+  settings.ServerPassword = input.serverPassword;
+  settings.MaxSlots = Math.min(Math.max(input.maxPlayers, 1), 255);
+  settings.ServerPort = input.gamePort;
+  settings.RestApiEnabled = Boolean(input.adminPassword);
+  settings.RestApiPort = input.restPort;
+  settings.ApplicationRestTokens = input.adminPassword
+    ? { [input.adminPassword]: { Username: "palisade", UserGroupName: "superadmin" } }
+    : {};
+  for (const def of input.catalog.settings) {
+    if (TERRARIA_CLI_KEYS[def.key]) continue; // launch args, not config keys
+    const raw = input.config.values?.[def.key] ?? def.default;
+    if (raw === undefined || raw === null) continue;
+    settings[def.emitAs ?? def.key] = raw;
+  }
+  return JSON.stringify(doc, null, 2);
+}
 
 /** The repurposed map field -> Core Keeper's WORLD_MODE numeric value. */
 const CORE_KEEPER_WORLD_MODES: Record<string, number> = {

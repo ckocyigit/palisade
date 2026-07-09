@@ -17,6 +17,7 @@ import { SATISFACTORY_CATALOG } from "./satisfactory.catalog";
 import { LIF_CATALOG } from "./lif.catalog";
 import { ATS_CATALOG, ETS2_CATALOG } from "./ats.catalog";
 import { CORE_KEEPER_CATALOG } from "./core-keeper.catalog";
+import { TERRARIA_CATALOG } from "./terraria.catalog";
 import { serializeGameIni, serializeGameUserSettings } from "./ini-serializer";
 
 @Injectable()
@@ -40,6 +41,7 @@ export class CatalogService {
     if (game === Game.ATS) return ATS_CATALOG;
     if (game === Game.ETS2) return ETS2_CATALOG;
     if (game === Game.CORE_KEEPER) return CORE_KEEPER_CATALOG;
+    if (game === Game.TERRARIA) return TERRARIA_CATALOG;
     throw new NotFoundException(`Unknown game: ${game}`);
   }
 

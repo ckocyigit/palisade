@@ -45,6 +45,7 @@ export function UnofficialListHelp({
   const satisfactory = game === Game.SATISFACTORY;
   const lif = game === Game.LIF;
   const ats = game === Game.ATS || game === Game.ETS2;
+  const terraria = game === Game.TERRARIA;
   const passwordHint = hasJoinPassword
     ? "your server has a join password"
     : "ON only if you set a join password";
@@ -59,8 +60,8 @@ export function UnofficialListHelp({
       >
         <span className="flex items-center gap-1.5">
           <Search className="h-3.5 w-3.5" />
-          {minecraft || bedrock
-            ? "Add it to your Minecraft server list"
+          {minecraft || bedrock || terraria
+            ? "Add it to your server list"
             : satisfactory
               ? "Add it to your Server Manager"
             : conan || palworld || icarus || valheim || sdtd || enshrouded || zomboid || vrising || sotf || lif || ats
@@ -71,7 +72,20 @@ export function UnofficialListHelp({
       </button>
 
       {open &&
-        (sdtd ? (
+        (terraria ? (
+          <div className="space-y-1.5 border-t border-ark-border px-2.5 py-2 text-xs">
+            <p className="text-slate-400">
+              Terraria has no public browser — players join by IP:
+            </p>
+            <FilterRow state="on" label="Multiplayer → Join via IP, enter the address + port above" />
+            <FilterRow state={hasJoinPassword ? "on" : "off"} label="Password prompt on join" hint={passwordHint} />
+            <p className="pt-1 leading-snug text-slate-400">
+              The world <span className="font-mono text-slate-200">{serverName}</span> is created on the first
+              start (size from the create form). Online, friends use your public IP (forward TCP{" "}
+              {queryPort ?? 7777}).
+            </p>
+          </div>
+        ) : sdtd ? (
           <div className="space-y-1.5 border-t border-ark-border px-2.5 py-2 text-xs">
             <p className="text-slate-400">
               In <span className="text-slate-200">Join a Game</span>:

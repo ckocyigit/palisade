@@ -1030,6 +1030,87 @@ describe("buildContainerSpec (Core Keeper / escaping)", () => {
   });
 });
 
+describe("buildContainerSpec + patchTShockConfig (Terraria / ryshe)", () => {
+  it("passes world-creation args through Cmd and publishes game + REST ports", async () => {
+    const { buildContainerSpec } = await import("./runtime-spec");
+    const { TERRARIA_CATALOG } = await import("../catalog/terraria.catalog");
+    const spec = buildContainerSpec({
+      serverId: "srv1",
+      game: Game.TERRARIA,
+      map: "TerrariaLarge",
+      sessionName: "Corruption Co",
+      ports: { game: 7777, rawSocket: 7779, query: 7777, rcon: 7878 },
+      maxPlayers: 8,
+      adminPassword: "resttoken",
+      serverPassword: "hunter2",
+      modIds: [],
+      cluster: null,
+      config: { values: { TERRARIA_DIFFICULTY: "2", TERRARIA_SEED: "worthy" } },
+      catalog: TERRARIA_CATALOG,
+    });
+    expect(spec.Image).toBe("ryshe/terraria:latest");
+    expect(envOf(spec)).toContain("WORLD_FILENAME=world.wld");
+    expect(spec.Cmd).toEqual([
+      "-autocreate", "3", "-worldname", "Corruption Co", "-difficulty", "2", "-seed", "worthy",
+    ]);
+    expect(spec.HostConfig?.PortBindings?.["7777/tcp"]).toEqual([{ HostPort: "7777" }]);
+    expect(spec.HostConfig?.PortBindings?.["7878/tcp"]).toEqual([{ HostPort: "7878" }]);
+    const binds = spec.HostConfig?.Binds ?? [];
+    expect(binds.some((b) => b.endsWith(":/root/.local/share/Terraria/Worlds"))).toBe(true);
+    expect(binds.some((b) => b.endsWith(":/tshock/ServerPlugins"))).toBe(true);
+  });
+
+  it("patchTShockConfig merges into Settings, preserving TShock's other keys", async () => {
+    const { patchTShockConfig } = await import("./runtime-spec");
+    const { TERRARIA_CATALOG } = await import("../catalog/terraria.catalog");
+    const existing = JSON.stringify({
+      Settings: { ServerName: "old", KickOnMediumcoreDeath: false, CommandSpecifier: "/" },
+    });
+    const out = JSON.parse(
+      patchTShockConfig(existing, {
+        sessionName: "Corruption Co",
+        serverPassword: "hunter2",
+        adminPassword: "resttoken",
+        maxPlayers: 8,
+        gamePort: 7777,
+        restPort: 7878,
+        catalog: TERRARIA_CATALOG,
+        config: { values: { PvPMode: "disabled" } },
+      }),
+    ) as { Settings: Record<string, unknown> };
+    expect(out.Settings.ServerName).toBe("Corruption Co");
+    expect(out.Settings.ServerPassword).toBe("hunter2");
+    expect(out.Settings.MaxSlots).toBe(8);
+    expect(out.Settings.RestApiEnabled).toBe(true);
+    expect(out.Settings.ApplicationRestTokens).toEqual({
+      resttoken: { Username: "palisade", UserGroupName: "superadmin" },
+    });
+    expect(out.Settings.PvPMode).toBe("disabled");
+    expect(out.Settings.SpawnProtection).toBe(true); // catalog default applied
+    expect(out.Settings.KickOnMediumcoreDeath).toBe(false); // TShock's own key preserved
+    expect(out.Settings.TERRARIA_DIFFICULTY).toBeUndefined(); // CLI keys stay out of the config
+  });
+
+  it("disables the REST API when no admin token is set", async () => {
+    const { patchTShockConfig } = await import("./runtime-spec");
+    const { TERRARIA_CATALOG } = await import("../catalog/terraria.catalog");
+    const out = JSON.parse(
+      patchTShockConfig(null, {
+        sessionName: "NoRest",
+        serverPassword: "",
+        adminPassword: "",
+        maxPlayers: 8,
+        gamePort: 7777,
+        restPort: 7878,
+        catalog: TERRARIA_CATALOG,
+        config: { values: {} },
+      }),
+    ) as { Settings: Record<string, unknown> };
+    expect(out.Settings.RestApiEnabled).toBe(false);
+    expect(out.Settings.ApplicationRestTokens).toEqual({});
+  });
+});
+
 describe("parsePzModIds", () => {
   it("parses 'Mod ID:' lines from a Workshop description (deduped, in order)", async () => {
     const { parsePzModIds } = await import("../mods/mods.service");

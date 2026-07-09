@@ -135,6 +135,14 @@ export const ETS2_PORTS: PortSet = { game: 27018, rawSocket: 27020, query: 27019
 export const CORE_KEEPER_PORTS: PortSet = { game: 0, rawSocket: 0, query: 0, rcon: 0 };
 
 /**
+ * Terraria: the canonical game port 7777 (TCP), plus TShock's REST API on 7878
+ * (carried in the rcon slot — it's the admin/management surface and stays
+ * LAN-only). query mirrors the game port; rawSocket unused. NOTE: 7777 overlaps
+ * the ARK block + Satisfactory — the start-time conflict guard covers it.
+ */
+export const TERRARIA_PORTS: PortSet = { game: 7777, rawSocket: 7779, query: 7777, rcon: 7878 };
+
+/**
  * Every host port a server binds (skipping unused 0 slots — e.g. rcon on no-RCON
  * games). Valheim also binds its HTTP status endpoint on game + 3, and Minecraft's
  * query column mirrors the game port (the set dedupes it). Used by the start-time
@@ -231,6 +239,8 @@ export function forwardSpec(game: Game, ports: PortSet): ForwardPort[] {
       ];
     case Game.CORE_KEEPER:
       return []; // Steam relay — nothing to forward
+    case Game.TERRARIA:
+      return [{ port: ports.game, proto: "tcp", label: "game" }]; // REST stays LAN-only
     default:
       // ARK family + Conan: game + raw socket + query, all UDP.
       return [
@@ -257,5 +267,6 @@ export function portsFor(game: Game): PortSet {
   if (game === Game.ATS) return ATS_PORTS;
   if (game === Game.ETS2) return ETS2_PORTS;
   if (game === Game.CORE_KEEPER) return CORE_KEEPER_PORTS;
+  if (game === Game.TERRARIA) return TERRARIA_PORTS;
   return FIXED_PORTS;
 }

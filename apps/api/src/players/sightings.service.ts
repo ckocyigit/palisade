@@ -61,6 +61,7 @@ const ACTIONS_BY_GAME: Record<Game, PlayerAction[]> = {
   [Game.ATS]: [], // no console; Convoy sessions have no server-side moderation
   [Game.ETS2]: [],
   [Game.CORE_KEEPER]: [], // no console; joins are gated by the secret Game ID
+  [Game.TERRARIA]: [], // stdin console only; capture-only from join log lines
 };
 
 const CAPTURE_NOTES: Partial<Record<Game, string>> = {
@@ -68,6 +69,7 @@ const CAPTURE_NOTES: Partial<Record<Game, string>> = {
   [Game.BEDROCK]: "Captured from join log lines (gamertag + XUID).",
   [Game.VALHEIM]: "Captured from join log lines (character name + SteamID64).",
   [Game.ENSHROUDED]: "Captured from join log lines when the server prints them.",
+  [Game.TERRARIA]: "Captured from join log lines (character name).",
   [Game.MINECRAFT]: "Captured from the live player list + join log lines.",
 };
 
@@ -207,6 +209,13 @@ export class SightingsService implements OnModuleInit {
     if (game === Game.ENSHROUDED) {
       const m = line.match(/Player '([^']+)' (?:joined|logged in|connected)/i);
       if (m) void this.upsert(serverId, m[1]!);
+      return;
+    }
+    if (game === Game.TERRARIA) {
+      // "<CharName> has joined." (chat lines are "<name> text", so anchor on the
+      // exact suffix; names are <= 20 chars).
+      const m = line.match(/^(.{1,20}) has joined\.\s*$/);
+      if (m) void this.upsert(serverId, m[1]!.trim());
     }
   }
 

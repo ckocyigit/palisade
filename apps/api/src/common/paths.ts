@@ -97,6 +97,9 @@ export const LocalPaths = {
         // The world lives in the server-data bind; the install (+ GameID.txt,
         // which is derived from the world anyway) is skipped.
         return ["data"];
+      case Game.TERRARIA:
+        // Worlds + TShock's config.json share one bind; plugins are user content.
+        return ["worlds", "plugins"];
       default:
         return ["ShooterGame/Saved"]; // ASA (POK)
     }

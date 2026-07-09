@@ -70,6 +70,11 @@ export const IMAGES: Record<Game, string> = {
   // RELAY: no ports at all — players join with the Game ID token the server writes
   // to GameID.txt in the server-files bind. NO RCON.
   [Game.CORE_KEEPER]: "escaping/core-keeper-dedicated:latest",
+  // ryshe/terraria — TShock (server + admin plugin framework) baked into the image;
+  // nothing to download on boot. TShock's config.json lives IN the worlds volume
+  // (CONFIGPATH), rendered by the manager; its REST API (7878) powers player
+  // counts. Console is stdin-only (hidden); world args pass through the entrypoint.
+  [Game.TERRARIA]: "ryshe/terraria:latest",
 };
 
 /** POK keeps all instance data (install + saves + config) under this path. */
@@ -146,6 +151,12 @@ export const ETS2_SAVE_SUBDIR = ".local/share/Euro Truck Simulator 2";
 export const CORE_KEEPER_FILES_DIR = "/home/steam/core-keeper-dedicated";
 export const CORE_KEEPER_DATA_DIR = "/home/steam/core-keeper-data";
 
+/** Terraria (ryshe/TShock): worlds + TShock config.json share one volume
+ *  (CONFIGPATH points there); plugins + logs are separate volumes. */
+export const TERRARIA_WORLDS_DIR = "/root/.local/share/Terraria/Worlds";
+export const TERRARIA_PLUGINS_DIR = "/tshock/ServerPlugins";
+export const TERRARIA_LOGS_DIR = "/tshock/logs";
+
 /**
  * The uid/gid each image runs the server as. Neither chowns its mounts fully
  * (POK never does; hermsi only chowns the volume root), so the manager makes the
@@ -170,6 +181,7 @@ export const SERVER_UID: Record<Game, number> = {
   [Game.ATS]: 99, // same ich777 wrapper convention
   [Game.ETS2]: 99,
   [Game.CORE_KEEPER]: 1000, // escaping's steam user, remapped via PUID/PGID (we pass ours)
+  [Game.TERRARIA]: 0, // the ryshe image runs as root
 };
 export const SERVER_GID: Record<Game, number> = {
   [Game.ASA]: 7777,
@@ -190,4 +202,5 @@ export const SERVER_GID: Record<Game, number> = {
   [Game.ATS]: 100,
   [Game.ETS2]: 100,
   [Game.CORE_KEEPER]: 1000,
+  [Game.TERRARIA]: 0,
 };

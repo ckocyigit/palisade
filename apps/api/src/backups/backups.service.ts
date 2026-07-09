@@ -296,6 +296,7 @@ export class BackupsService {
       game === Game.ETS2 ||
       game === Game.CORE_KEEPER
     ) {
+      // (Terraria runs as root — it falls through to SERVER_UID/GID = 0.)
       const env = loadEnv();
       return [Number(env.PUID), Number(env.PGID)];
     }

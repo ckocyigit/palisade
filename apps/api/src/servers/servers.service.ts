@@ -47,6 +47,7 @@ import {
   renderSotfConfig,
   patchLifWorldXml,
   patchAtsServerConfig,
+  patchTShockConfig,
 } from "./runtime-spec";
 import { portsFor, serverPortSet } from "../catalog/ports";
 import { LocalPaths } from "../common/paths";
@@ -151,6 +152,9 @@ export const READY_RE_BY_GAME: Record<Game, RegExp> = {
   // "failed to initialize steam." line is a non-fatal first try; the retry
   // succeeds and "Listening on SteamID" precedes this marker.)
   [Game.CORE_KEEPER]: /Started session with info/i,
+  // Terraria/TShock prints "Listening on port 7777" (then "Server started") once
+  // the world is loaded and joinable. PROVISIONAL — confirm against a real boot.
+  [Game.TERRARIA]: /Listening on port|Server started/i,
 };
 
 /** The "server is now joinable" log-marker regex for a game. */
@@ -1145,7 +1149,8 @@ export class ServersService implements OnApplicationBootstrap {
       game === Game.LIF ||
       game === Game.ATS ||
       game === Game.ETS2 ||
-      game === Game.CORE_KEEPER
+      game === Game.CORE_KEEPER ||
+      game === Game.TERRARIA
     )
       return;
     if (!containerId || game === Game.CONAN || game === Game.MINECRAFT || game === Game.ZOMBOID) {
@@ -1377,6 +1382,28 @@ export class ServersService implements OnApplicationBootstrap {
         });
         if (patched !== xml) await writeFile(file, patched, "utf8");
       }
+      return;
+    }
+
+    // Terraria: TShock's config.json lives in the worlds bind (CONFIGPATH). Merge
+    // our first-class fields + catalog keys into it before every start; TShock
+    // fills in / rewrites all its other defaults on boot.
+    if (game === Game.TERRARIA) {
+      const dir = join(env.DATA_DIR, "instances", server.id, "worlds");
+      await mkdir(dir, { recursive: true });
+      const file = join(dir, "config.json");
+      const existing = await readFile(file, "utf8").catch(() => null);
+      const patched = patchTShockConfig(existing, {
+        sessionName: server.name,
+        serverPassword: server.serverPasswordEnc ? this.crypto.decrypt(server.serverPasswordEnc) : "",
+        adminPassword: server.adminPasswordEnc ? this.crypto.decrypt(server.adminPasswordEnc) : "",
+        maxPlayers: server.maxPlayers,
+        gamePort: server.gamePort,
+        restPort: server.rconPort,
+        catalog: this.catalog.getCatalog(Game.TERRARIA),
+        config: JSON.parse(server.configJson) as ServerConfigValues,
+      });
+      if (patched !== existing) await writeFile(file, patched, "utf8");
       return;
     }
 
