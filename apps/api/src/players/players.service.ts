@@ -22,6 +22,7 @@ const A2S_GAMES = new Set<Game>([
   Game.SEVEN_DAYS,
   Game.ENSHROUDED,
   Game.VRISING,
+  Game.SOTF,
 ]);
 
 /**

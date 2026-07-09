@@ -44,6 +44,10 @@ export const IMAGES: Record<Game, string> = {
   // it under Wine. Settings via generic HOST_SETTINGS_*/GAME_SETTINGS_* env vars
   // that patch the two settings JSONs. Source RCON (we enable it via env).
   [Game.VRISING]: "trueosiris/vrising:latest",
+  // jammsen — installs the SotF Windows server (app 2465200) via SteamCMD on boot and
+  // runs it under Wine as a non-root steam user (PUID/PGID). We render
+  // userdata/dedicatedserver.cfg (the init script only seeds it when missing). NO RCON.
+  [Game.SOTF]: "jammsen/sons-of-the-forest-dedicated-server:latest",
 };
 
 /** POK keeps all instance data (install + saves + config) under this path. */
@@ -98,6 +102,10 @@ export const ZOMBOID_DATA_DIR = "/home/steam/Zomboid";
 export const VRISING_SERVER_DIR = "/mnt/vrising/server";
 export const VRISING_DATA_DIR = "/mnt/vrising/persistentdata";
 
+/** Sons of the Forest (jammsen): ONE volume holds the ~10 GB game install AND the
+ *  userdata (config + saves) at <vol>/userdata — backups target just userdata. */
+export const SOTF_GAME_DIR = "/sonsoftheforest";
+
 /**
  * The uid/gid each image runs the server as. Neither chowns its mounts fully
  * (POK never does; hermsi only chowns the volume root), so the manager makes the
@@ -116,6 +124,7 @@ export const SERVER_UID: Record<Game, number> = {
   [Game.ENSHROUDED]: 4711, // mornedhels default (overridable via PUID/PGID); env-driven, no INI injection
   [Game.ZOMBOID]: 1000, // danixu86 runs as the "steam" user
   [Game.VRISING]: 0, // trueosiris runs as root (no PUID/PGID support)
+  [Game.SOTF]: 1000, // jammsen's steam user, remapped to env PUID/PGID (entrypoint chowns)
 };
 export const SERVER_GID: Record<Game, number> = {
   [Game.ASA]: 7777,
@@ -130,4 +139,5 @@ export const SERVER_GID: Record<Game, number> = {
   [Game.ENSHROUDED]: 4711,
   [Game.ZOMBOID]: 1000,
   [Game.VRISING]: 0,
+  [Game.SOTF]: 1000,
 };

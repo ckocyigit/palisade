@@ -41,6 +41,7 @@ export function UnofficialListHelp({
   const enshrouded = game === Game.ENSHROUDED;
   const zomboid = game === Game.ZOMBOID;
   const vrising = game === Game.VRISING;
+  const sotf = game === Game.SOTF;
   const passwordHint = hasJoinPassword
     ? "your server has a join password"
     : "ON only if you set a join password";
@@ -57,7 +58,7 @@ export function UnofficialListHelp({
           <Search className="h-3.5 w-3.5" />
           {minecraft || bedrock
             ? "Add it to your Minecraft server list"
-            : conan || palworld || icarus || valheim || sdtd || enshrouded || zomboid || vrising
+            : conan || palworld || icarus || valheim || sdtd || enshrouded || zomboid || vrising || sotf
               ? "Find it in the in-game server browser"
               : "Find it on the in-game Unofficial list"}
         </span>
@@ -79,6 +80,23 @@ export function UnofficialListHelp({
             <p className="pt-1 leading-snug text-slate-400">
               Search the name <span className="font-mono text-slate-200">{serverName}</span>, or use{" "}
               <span className="text-slate-200">Connect to Server</span> with the address shown above.
+            </p>
+          </div>
+        ) : sotf ? (
+          <div className="space-y-1.5 border-t border-ark-border px-2.5 py-2 text-xs">
+            <p className="text-slate-400">
+              In <span className="text-slate-200">Multiplayer → Join → Dedicated</span>:
+            </p>
+            <FilterRow state="on" label="Search / filter the dedicated list by name" />
+            <FilterRow
+              state={hasJoinPassword ? "on" : "off"}
+              label="Password-protected filter"
+              hint={passwordHint}
+            />
+            <p className="pt-1 leading-snug text-slate-400">
+              Search the name <span className="font-mono text-slate-200">{serverName}</span>. Sons of the
+              Forest has no direct-connect field — LAN players see it automatically; online players need the
+              forwarded ports. 'LAN only' in Settings hides it from the internet list.
             </p>
           </div>
         ) : vrising ? (

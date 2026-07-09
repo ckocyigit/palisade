@@ -89,6 +89,14 @@ export const ZOMBOID_STEAM_PORTS = [8766, 8767] as const;
 export const VRISING_PORTS: PortSet = { game: 9876, rawSocket: 9878, query: 9877, rcon: 25575 };
 
 /**
+ * Sons of the Forest: game on UDP 8766, Steam query on UDP 27016, blob-sync on
+ * UDP 9700 (carried in the rawSocket slot). NO RCON (rcon 0, Console UI hidden).
+ * NOTE: 8766 overlaps Zomboid's Steam comms port — the start-time conflict guard
+ * prevents running both at once.
+ */
+export const SOTF_PORTS: PortSet = { game: 8766, rawSocket: 9700, query: 27016, rcon: 0 };
+
+/**
  * Every host port a server binds (skipping unused 0 slots — e.g. rcon on no-RCON
  * games). Valheim also binds its HTTP status endpoint on game + 3, and Minecraft's
  * query column mirrors the game port (the set dedupes it). Used by the start-time
@@ -155,6 +163,12 @@ export function forwardSpec(game: Game, ports: PortSet): ForwardPort[] {
         { port: ports.game, proto: "udp", label: "game" },
         { port: ports.query, proto: "udp", label: "query (server browser)" },
       ];
+    case Game.SOTF:
+      return [
+        { port: ports.game, proto: "udp", label: "game" },
+        { port: ports.query, proto: "udp", label: "query (server browser)" },
+        { port: ports.rawSocket, proto: "udp", label: "blob sync" },
+      ];
     default:
       // ARK family + Conan: game + raw socket + query, all UDP.
       return [
@@ -175,5 +189,6 @@ export function portsFor(game: Game): PortSet {
   if (game === Game.ENSHROUDED) return ENSHROUDED_PORTS;
   if (game === Game.ZOMBOID) return ZOMBOID_PORTS;
   if (game === Game.VRISING) return VRISING_PORTS;
+  if (game === Game.SOTF) return SOTF_PORTS;
   return FIXED_PORTS;
 }

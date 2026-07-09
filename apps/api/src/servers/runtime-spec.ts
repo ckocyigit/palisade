@@ -30,8 +30,10 @@ import {
   ZOMBOID_DATA_DIR,
   VRISING_SERVER_DIR,
   VRISING_DATA_DIR,
+  SOTF_GAME_DIR,
 } from "../common/images";
 import { ZOMBOID_STEAM_PORTS } from "../catalog/ports";
+import { SOTF_GAME_SETTINGS_KEYS } from "../catalog/sotf.catalog";
 import { ARK_NETWORK, containerName } from "../common/naming";
 import { loadEnv } from "../config/env";
 
@@ -72,6 +74,7 @@ export function buildContainerSpec(input: RuntimeSpecInput): Docker.ContainerCre
   if (input.game === Game.ENSHROUDED) return buildEnshroudedSpec(input);
   if (input.game === Game.ZOMBOID) return buildZomboidSpec(input);
   if (input.game === Game.VRISING) return buildVRisingSpec(input);
+  if (input.game === Game.SOTF) return buildSotfSpec(input);
   return buildAseSpec(input);
 }
 
@@ -1191,6 +1194,103 @@ function vrisingCatalogEnv(input: RuntimeSpecInput): string[] {
     out.push(`${def.emitAs ?? def.key}=${val}`);
   }
   return out;
+}
+
+/**
+ * Sons of the Forest: drive the jammsen image. It installs the game (app 2465200)
+ * via SteamCMD on boot into the single game bind and runs it under Wine as the
+ * steam user (PUID/PGID, entrypoint chowns the bind). ALL settings live in
+ * userdata/dedicatedserver.cfg — rendered by the manager (renderSotfConfig) before
+ * every start; the image only seeds its example when the file is missing. NO RCON.
+ */
+function buildSotfSpec(input: RuntimeSpecInput): Docker.ContainerCreateOptions {
+  const env = loadEnv();
+  const { ports } = input;
+
+  const sotfEnv = [
+    `TZ=${input.timezone || env.TZ}`,
+    `PUID=${env.PUID}`,
+    `PGID=${env.PGID}`,
+    `ALWAYS_UPDATE_ON_START=true`,
+    `SKIP_NETWORK_ACCESSIBILITY_TEST=true`,
+    `FILTER_SHADER_AND_MESH_AND_WINE_DEBUG=true`, // strip Wine/shader log spam
+  ];
+
+  const binds = [`${HostPaths.instanceRoot(input.serverId)}/game:${SOTF_GAME_DIR}`];
+
+  const udpPorts = [ports.game, ports.query, ports.rawSocket]; // 8766 / 27016 / 9700 (blob sync)
+  const hostNet = env.GAME_HOST_NETWORK;
+  return {
+    name: containerName(input.serverId, input.game, input.sessionName),
+    Image: IMAGES[Game.SOTF],
+    Hostname: containerName(input.serverId, input.game, input.sessionName),
+    Env: sotfEnv,
+    Labels: serverLabels(input, env.PUBLIC_BASE_URL),
+    ...(hostNet
+      ? {}
+      : { ExposedPorts: Object.fromEntries(udpPorts.map((p) => [portKey(p, "udp"), {}])) }),
+    HostConfig: {
+      Binds: binds,
+      ...(hostNet
+        ? { NetworkMode: "host" }
+        : {
+            PortBindings: Object.fromEntries(
+              udpPorts.map((p) => [portKey(p, "udp"), [{ HostPort: String(p) }]]),
+            ),
+          }),
+      RestartPolicy: { Name: "no" }, // manager watchdog owns restarts
+      Memory: input.ramLimitMb ? input.ramLimitMb * 1024 * 1024 : undefined,
+      NanoCpus: input.cpuLimit ? Math.round(input.cpuLimit * 1e9) : undefined,
+    },
+    ...(hostNet ? {} : { NetworkingConfig: { EndpointsConfig: { [ARK_NETWORK]: {} } } }),
+  };
+}
+
+/**
+ * Render Sons of the Forest's dedicatedserver.cfg (JSON). First-class fields
+ * (name, join password, slots, ports, GameMode from the repurposed map field)
+ * plus the catalog's cfg keys; the GS_ catalog keys land inside the nested
+ * GameSettings object under the game's dotted names.
+ */
+export function renderSotfConfig(input: {
+  sessionName: string;
+  serverPassword: string;
+  maxPlayers: number;
+  map: string; // repurposed as GameMode (Normal/Hard/Peaceful/Creative)
+  ports: PortSet;
+  catalog: SettingsCatalog;
+  config: ServerConfigValues;
+}): string {
+  const values: Record<string, unknown> = {};
+  for (const def of input.catalog.settings) {
+    if (def.target !== SettingTarget.Env) continue;
+    values[def.key] = input.config.values?.[def.key] ?? def.default;
+  }
+  const gameSettings: Record<string, unknown> = {};
+  for (const [key, dotted] of Object.entries(SOTF_GAME_SETTINGS_KEYS)) {
+    if (values[key] !== undefined) {
+      gameSettings[dotted] = values[key];
+      delete values[key];
+    }
+  }
+  const cfg = {
+    IpAddress: "0.0.0.0",
+    GamePort: input.ports.game,
+    QueryPort: input.ports.query,
+    BlobSyncPort: input.ports.rawSocket,
+    ServerName: input.sessionName,
+    MaxPlayers: Math.min(Math.max(input.maxPlayers, 1), 8),
+    Password: input.serverPassword,
+    SaveMode: "Continue",
+    GameMode: input.map,
+    LogFilesEnabled: false,
+    TimestampLogFilenames: true,
+    TimestampLogEntries: true,
+    ...values,
+    GameSettings: gameSettings,
+    CustomGameModeSettings: {},
+  };
+  return JSON.stringify(cfg, null, 2);
 }
 
 /**

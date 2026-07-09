@@ -74,6 +74,10 @@ export const LocalPaths = {
         // The persistentdata bind: world saves (Saves/) + the two settings JSONs
         // (Settings/). The ~2 GB game install lives in the separate server bind.
         return ["persistentdata"];
+      case Game.SOTF:
+        // dedicatedserver.cfg + ownerswhitelist + Saves live under userdata inside
+        // the single game bind; the ~10 GB install beside it is skipped.
+        return ["game/userdata"];
       default:
         return ["ShooterGame/Saved"]; // ASA (POK)
     }

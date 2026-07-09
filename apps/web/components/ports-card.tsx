@@ -7,7 +7,7 @@ import { apiPatch } from "@/lib/api";
 /** Games whose query port is a real, independently-configurable port. Valheim and
  *  7DTD derive theirs from the game port (so only the game port is editable);
  *  Minecraft/Bedrock have none. */
-const INDEPENDENT_QUERY = new Set<Game>([Game.ASA, Game.ASE, Game.CONAN, Game.ICARUS, Game.ENSHROUDED, Game.VRISING]);
+const INDEPENDENT_QUERY = new Set<Game>([Game.ASA, Game.ASE, Game.CONAN, Game.ICARUS, Game.ENSHROUDED, Game.VRISING, Game.SOTF]);
 /** Games with an editable remote-console port (Source RCON, or telnet for 7DTD). */
 const HAS_RCON_PORT = new Set<Game>([
   Game.ASA,

@@ -694,6 +694,83 @@ describe("buildContainerSpec (V Rising / trueosiris)", () => {
   });
 });
 
+describe("buildContainerSpec + renderSotfConfig (Sons of the Forest / jammsen)", () => {
+  const input = {
+    serverId: "srv1",
+    game: Game.SOTF,
+    map: "Hard",
+    sessionName: "Forest Camp",
+    ports: { game: 8766, rawSocket: 9700, query: 27016, rcon: 0 },
+    maxPlayers: 8,
+    adminPassword: "",
+    serverPassword: "hunter2",
+    modIds: [],
+    cluster: null,
+    config: { values: {} } as ServerConfigValues,
+  };
+
+  it("publishes the 3 UDP ports, no RCON, single game bind, PUID env", async () => {
+    const { buildContainerSpec } = await import("./runtime-spec");
+    const { SOTF_CATALOG } = await import("../catalog/sotf.catalog");
+    const spec = buildContainerSpec({ ...input, catalog: SOTF_CATALOG });
+    expect(spec.Image).toBe("jammsen/sons-of-the-forest-dedicated-server:latest");
+    const env = envOf(spec);
+    expect(env).toContain("ALWAYS_UPDATE_ON_START=true");
+    expect(env).toContain("SKIP_NETWORK_ACCESSIBILITY_TEST=true");
+    for (const p of ["8766/udp", "27016/udp", "9700/udp"]) {
+      expect(spec.HostConfig?.PortBindings?.[p]).toEqual([{ HostPort: p.split("/")[0] }]);
+    }
+    expect(Object.keys(spec.HostConfig?.PortBindings ?? {}).some((k) => k.endsWith("/tcp"))).toBe(false);
+    expect((spec.HostConfig?.Binds ?? []).some((b) => b.endsWith(":/sonsoftheforest"))).toBe(true);
+  });
+
+  it("renders dedicatedserver.cfg with first-class fields + nested GameSettings", async () => {
+    const { renderSotfConfig } = await import("./runtime-spec");
+    const { SOTF_CATALOG } = await import("../catalog/sotf.catalog");
+    const cfg = JSON.parse(
+      renderSotfConfig({
+        sessionName: "Forest Camp",
+        serverPassword: "hunter2",
+        maxPlayers: 8,
+        map: "Hard",
+        ports: input.ports,
+        catalog: SOTF_CATALOG,
+        config: { values: { GS_TreeRegrowth: false, SaveInterval: 300 } },
+      }),
+    ) as Record<string, unknown>;
+    expect(cfg.ServerName).toBe("Forest Camp");
+    expect(cfg.Password).toBe("hunter2");
+    expect(cfg.GameMode).toBe("Hard"); // repurposed map field
+    expect(cfg.GamePort).toBe(8766);
+    expect(cfg.QueryPort).toBe(27016);
+    expect(cfg.BlobSyncPort).toBe(9700);
+    expect(cfg.SaveMode).toBe("Continue");
+    expect(cfg.SaveInterval).toBe(300);
+    expect(cfg.SkipNetworkAccessibilityTest).toBe(true); // catalog default
+    // GS_ keys land inside GameSettings under the game's dotted names, not top-level.
+    expect((cfg.GameSettings as Record<string, unknown>)["Gameplay.TreeRegrowth"]).toBe(false);
+    expect((cfg.GameSettings as Record<string, unknown>)["Structure.Damage"]).toBe(true);
+    expect(cfg.GS_TreeRegrowth).toBeUndefined();
+  });
+
+  it("caps MaxPlayers at SotF's 8", async () => {
+    const { renderSotfConfig } = await import("./runtime-spec");
+    const { SOTF_CATALOG } = await import("../catalog/sotf.catalog");
+    const cfg = JSON.parse(
+      renderSotfConfig({
+        sessionName: "Big",
+        serverPassword: "",
+        maxPlayers: 20,
+        map: "Normal",
+        ports: input.ports,
+        catalog: SOTF_CATALOG,
+        config: { values: {} },
+      }),
+    ) as Record<string, unknown>;
+    expect(cfg.MaxPlayers).toBe(8);
+  });
+});
+
 describe("parsePzModIds", () => {
   it("parses 'Mod ID:' lines from a Workshop description (deduped, in order)", async () => {
     const { parsePzModIds } = await import("../mods/mods.service");

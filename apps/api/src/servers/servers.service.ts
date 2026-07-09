@@ -41,7 +41,7 @@ import { ManagerSettingsService, SettingKeys } from "../manager-settings/manager
 import { LogCaptureService, LOG_CAPTURE_MAX } from "../logs/log-capture.service";
 import { BackupsService } from "../backups/backups.service";
 import { PlayersService } from "../players/players.service";
-import { buildContainerSpec, renderSdtdServerXml } from "./runtime-spec";
+import { buildContainerSpec, renderSdtdServerXml, renderSotfConfig } from "./runtime-spec";
 import { portsFor, serverPortSet } from "../catalog/ports";
 import { LocalPaths } from "../common/paths";
 import { containerName } from "../common/naming";
@@ -118,8 +118,11 @@ export const READY_RE_BY_GAME: Record<Game, RegExp> = {
   // CONFIRMED live: the exact line is "*** SERVER STARTED ****".
   [Game.ZOMBOID]: /SERVER STARTED/i,
   // V Rising logs this once the server registers with Steam and is joinable.
-  // PROVISIONAL — confirm against a real boot.
+  // CONFIRMED live: "PlatformSystemBase - Server connected to Steam successfully!".
   [Game.VRISING]: /Server connected to Steam successfully/i,
+  // Sons of the Forest logs its lobby/session registration once joinable.
+  // PROVISIONAL — confirm against a real boot.
+  [Game.SOTF]: /Session is advertised|accepting connections|GameServer(Online| started)/i,
 };
 
 /** The "server is now joinable" log-marker regex for a game. */
@@ -1052,7 +1055,8 @@ export class ServersService implements OnApplicationBootstrap {
       game === Game.VALHEIM ||
       game === Game.SEVEN_DAYS ||
       game === Game.ENSHROUDED ||
-      game === Game.VRISING
+      game === Game.VRISING ||
+      game === Game.SOTF
     )
       return;
     if (!containerId || game === Game.CONAN || game === Game.MINECRAFT || game === Game.ZOMBOID) {
@@ -1242,6 +1246,25 @@ export class ServersService implements OnApplicationBootstrap {
       // The image's fixed steam user must be able to rewrite the file on boot.
       await chown(dir, SERVER_UID[game], SERVER_GID[game]).catch(() => undefined);
       await chown(file, SERVER_UID[game], SERVER_GID[game]).catch(() => undefined);
+      return;
+    }
+
+    // Sons of the Forest: all settings live in userdata/dedicatedserver.cfg (JSON,
+    // no env interface) — render it into the game bind. The jammsen entrypoint
+    // chowns the whole bind to PUID/PGID on start, so root-written is fine.
+    if (game === Game.SOTF) {
+      const dir = join(env.DATA_DIR, "instances", server.id, "game", "userdata");
+      await mkdir(dir, { recursive: true });
+      const cfg = renderSotfConfig({
+        sessionName: server.name,
+        serverPassword: server.serverPasswordEnc ? this.crypto.decrypt(server.serverPasswordEnc) : "",
+        maxPlayers: server.maxPlayers,
+        map: server.map,
+        ports: this.portsOf(server),
+        catalog: this.catalog.getCatalog(Game.SOTF),
+        config: JSON.parse(server.configJson) as ServerConfigValues,
+      });
+      await writeFile(join(dir, "dedicatedserver.cfg"), cfg, "utf8");
       return;
     }
 
