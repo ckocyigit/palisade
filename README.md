@@ -10,7 +10,7 @@ container spawns and supervises a container per game server, manages every
 setting through schema-driven forms, and handles mods, backups, schedules,
 player administration, and even your router's port-forwards.
 
-**Supported games (14):**
+**Supported games (15):**
 
 | Game | Runtime | Console | Mods |
 |---|---|---|---|
@@ -28,6 +28,7 @@ player administration, and even your router's port-forwards.
 | V Rising | Wine | RCON (announce) | — (game has no official mod support) |
 | Sons of the Forest | Wine | — | — (game has no official mod support) |
 | Satisfactory | native | — (HTTPS API: auto-claim) | — (SFTP per upstream docs) |
+| Life is Feudal: Your Own | Wine (+ bundled MariaDB) | — (in-game GM password) | — (file-based per upstream docs) |
 
 **Feature highlights**
 
@@ -87,7 +88,7 @@ manager injects config, watches logs, and talks RCON/telnet/query protocols.
   echo "JWT_SECRET=$(openssl rand -hex 32)"
   ```
 
-- For the Wine/Proton games (Icarus, Enshrouded, V Rising, Sons of the Forest), the **host** needs a larger
+- For the Wine/Proton games (Icarus, Enshrouded, V Rising, Sons of the Forest, LiF:YO), the **host** needs a larger
   mmap limit or the server crashes on boot:
 
   ```bash
@@ -260,6 +261,7 @@ wouldn't exist without them:
 | V Rising | `trueosiris/vrising` | [TrueOsiris](https://github.com/TrueOsiris/docker-vrising) |
 | Sons of the Forest | `jammsen/sons-of-the-forest-dedicated-server` | [jammsen](https://github.com/jammsen/docker-sons-of-the-forest-dedicated-server) |
 | Satisfactory | `wolveix/satisfactory-server` | [wolveix](https://github.com/wolveix/satisfactory-server) |
+| Life is Feudal: Your Own | `ich777/steamcmd:lifyo` | [ich777](https://github.com/ich777/docker-steamcmd-server/tree/lifyo) |
 
 Also standing on: [SteamCMD](https://developer.valvesoftware.com/wiki/SteamCMD),
 GE-Proton/Wine for the Windows-only servers,
