@@ -1,11 +1,47 @@
 # ARK Server Manager
 
-A self-hosted, Docker-based control panel for **ARK: Survival Ascended (ASA)** and
-**ARK: Survival Evolved (ASE)** dedicated servers — built Unraid-first. It installs
-servers via SteamCMD, manages every setting, handles mods + clusters, and gives you
-a live RCON console and scheduled tasks.
+A self-hosted, Docker-based control panel for game dedicated servers — built
+Unraid-first, but it runs on any Linux box with Docker. One lean manager
+container spawns and supervises a container per game server, manages every
+setting through schema-driven forms, and handles mods, backups, schedules,
+player administration, and even your router's port-forwards.
 
-See [PLANNING.md](PLANNING.md) for the full architecture and roadmap.
+**Supported games (10):**
+
+| Game | Runtime | Console | Mods |
+|---|---|---|---|
+| ARK: Survival Ascended | Proton (POK image) | RCON | CurseForge browser |
+| ARK: Survival Evolved | native | RCON | Steam Workshop browser |
+| Conan Exiles | native | RCON | Steam Workshop browser |
+| Palworld | native | RCON | UE4SS/pak uploader |
+| Minecraft (Java) | native (itzg) | RCON | CurseForge modpacks (auto-install) |
+| Minecraft Bedrock | native (itzg) | — | add-on pack uploader |
+| Icarus | Wine | — | .pak uploader |
+| Valheim | native (lloesche) | — | Thunderstore browser (auto-deps) |
+| 7 Days to Die | native (LinuxGSM) | telnet (in-app) | mod-zip uploader |
+| Enshrouded | Proton | — | — (game has no mod support) |
+
+**Feature highlights**
+
+- Create → install → start with per-game readiness detection, graceful
+  shutdown, a crash watchdog, and a RAM guard that offers to back up + swap
+  servers when memory is tight.
+- Full per-game settings catalogs with presets, copy-between-servers, and
+  restart-needed tracking.
+- Live player counts for every game (A2S / RakNet ping / RCON / Valheim status
+  endpoint) with 1-hour sparklines, plus a **Players** roster captured from
+  player lists and join logs — kick / ban / whitelist / admin per game.
+- Backups: manual + scheduled with retention, restore, browser download, and
+  saves import. The manager also snapshots its own database nightly.
+- Schedules (restart / update / backup / stop / start) with in-game countdown
+  warnings, pre-action snapshots, and a "skip while players are online" guard.
+- ARK cluster support (shared transfer dir across servers).
+- Discord/webhook notifications, host low-disk warnings, editable ports with a
+  start-time port-conflict guard.
+- Optional **pfSense integration**: one-click WAN port-forward
+  create/fix/enable/disable/delete per server via the pfSense REST API.
+
+See [PLANNING.md](PLANNING.md) for architecture details.
 
 ## Architecture at a glance
 
@@ -13,105 +49,178 @@ See [PLANNING.md](PLANNING.md) for the full architecture and roadmap.
 ark-manager (this app) ──/var/run/docker.sock──> Docker daemon
    Next.js UI + NestJS API                       │ spawns
    SQLite · config engine · RCON · scheduler     ▼
-                                       one container per ARK server
+                                       one container per game server
 ```
 
-- The manager is a **lean control plane** — it contains no game runtime. Each ARK
-  server runs in its **own container** spawned from a base image.
-- Game files install **once per game** into a shared volume via an **ephemeral
-  SteamCMD installer container**.
-- Docker is controlled via the host's **Docker socket** mounted into the manager.
-  For least-privilege access you can instead front it with a
-  [docker-socket-proxy](https://github.com/Tecnativa/docker-socket-proxy) and point
-  `DOCKER_HOST` at it. Secrets (API keys, admin password) are **encrypted at rest**.
+The manager is a **control plane only** — it contains no game runtime. Each
+game server runs in its own container from a proven community image; the
+manager injects config, watches logs, and talks RCON/telnet/query protocols.
 
-## Monorepo layout
+---
 
-| Path | What |
-|---|---|
-| `packages/shared` | Types shared by API + web (game ids, state machine, settings-catalog, DTOs) |
-| `apps/api` | NestJS backend — orchestrator, config engine, RCON, installer, scheduler |
-| `apps/web` | Next.js frontend — dashboard, schema-driven settings, RCON console, schedules |
-| `docker/` | Manager start script + ASA/ASE game-server image Dockerfiles |
-| `unraid/` | Community Applications template |
+## Installation
+
+### Prerequisites
+
+- Docker on a Linux host (Unraid, Debian/Ubuntu, etc.). 16 GB+ RAM recommended —
+  a single populated game server wants 2–16 GB depending on the game.
+- A Docker bridge network for the manager (game containers join it too unless
+  you use host networking):
+
+  ```bash
+  docker network create ark-net
+  ```
+
+- Two secrets (generate once, keep safe — `SECRETS_KEY` encrypts stored API
+  keys/passwords, so losing it means re-entering them):
+
+  ```bash
+  echo "SECRETS_KEY=$(openssl rand -hex 32)"
+  echo "JWT_SECRET=$(openssl rand -hex 32)"
+  ```
+
+- For the Wine/Proton games (Icarus, Enshrouded), the **host** needs a larger
+  mmap limit or the server crashes on boot:
+
+  ```bash
+  sysctl -w vm.max_map_count=262144
+  # persist it: /etc/sysctl.conf, or on Unraid append to /boot/config/go
+  ```
+
+### Option A — plain `docker run`
+
+```bash
+docker run -d \
+  --name ark-server-manager \
+  --network ark-net \
+  --restart unless-stopped \
+  -p 8970:3000 \
+  -v /opt/ark-manager:/data \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  --add-host host.docker.internal:host-gateway \
+  -e NODE_ENV=production \
+  -e DATA_DIR=/data \
+  -e DATABASE_URL=file:/data/db.sqlite \
+  -e HOST_DATA_DIR=/opt/ark-manager \
+  -e PUBLIC_BASE_URL=http://YOUR-LAN-IP:8970 \
+  -e SECRETS_KEY=<64 hex chars> \
+  -e JWT_SECRET=<random string> \
+  -e PUID=99 -e PGID=100 \
+  -e TZ=America/Chicago \
+  -e GAME_HOST_NETWORK=true \
+  ghcr.io/shakes63/ark-server-manager:latest
+```
+
+Then open `http://YOUR-LAN-IP:8970` and complete the first-run wizard
+(create the admin account; API keys are optional and can be added later in
+Settings).
+
+### Option B — docker compose
+
+A reference [`docker-compose.yml`](docker-compose.yml) ships in the repo:
+
+```bash
+export SECRETS_KEY=... JWT_SECRET=... HOST_DATA_DIR=/opt/ark-manager
+docker compose up -d
+```
+
+### Option C — Unraid
+
+Use the [Community Applications template](unraid/ark-manager.xml): add it as a
+template, fill in the same variables, and the manager shows up as a normal
+Unraid Docker app (spawned game servers appear on the Docker page with proper
+icons and WebUI links back into the manager).
+
+### Environment variables
+
+| Variable | Required | Default | What |
+|---|---|---|---|
+| `SECRETS_KEY` | **yes** | — | 64 hex chars (32 bytes). Encrypts stored secrets at rest. |
+| `JWT_SECRET` | **yes** | — | Signs login tokens (sessions last 30 days). |
+| `HOST_DATA_DIR` | **yes**¹ | `DATA_DIR` | The data dir **as the host's Docker daemon sees it** (e.g. `/mnt/user/appdata/ark-manager` on Unraid). Game-container bind mounts resolve on the host, not inside the manager. |
+| `DATA_DIR` | no | `./data` | Data dir inside the manager container (mount your volume here, conventionally `/data`). |
+| `DATABASE_URL` | no | `file:./data/db.sqlite` | SQLite path — keep it inside `DATA_DIR`. |
+| `PUBLIC_BASE_URL` | no | `http://localhost:3000` | The address you actually browse to. Used for links and Unraid WebUI buttons. |
+| `GAME_HOST_NETWORK` | no | `false` | `true` = game containers use host networking (recommended — ASA/EOS and Steam query behave better without Docker NAT). Requires the `--add-host host.docker.internal:host-gateway` flag on the manager so it can still reach RCON/query. |
+| `DOCKER_HOST` | no | unix socket | Point at `tcp://socket-proxy:2375` for least-privilege Docker access ([docker-socket-proxy](https://github.com/Tecnativa/docker-socket-proxy)). |
+| `PUID` / `PGID` | no | `99` / `100` | Ownership for game files written by the manager (Unraid's `nobody:users` by default). |
+| `TZ` | no | `UTC` | Manager clock; also the default for game containers and schedules (overridable in Settings). |
+
+¹ Required whenever the container path and host path differ — i.e. basically
+always in production.
+
+### Data layout
+
+Everything lives under your data dir — one directory to back up:
+
+```
+/data
+├── db.sqlite            # server definitions, schedules, players, settings
+├── instances/<id>/      # each server's game files + world saves
+├── backups/<id>/        # world snapshots (retention-rotated)
+├── backups/_manager/    # nightly self-backups of db.sqlite (newest 14)
+└── clusters/<id>/       # ARK cluster transfer dirs
+```
+
+Deleting a server from the UI asks whether to wipe its instance + backups, and
+offers a browser download of the world saves first.
+
+### Updating
+
+The image is rebuilt on every push to `main`
+(GitHub Actions → `ghcr.io/shakes63/ark-server-manager:latest`). To update:
+pull the new image and recreate the container (Unraid's update button does
+both). Database migrations run automatically on boot.
+
+---
+
+## Integrations (all optional, all in Settings)
+
+| Integration | What it enables | What you need |
+|---|---|---|
+| CurseForge API key | ASA mod browser, Minecraft modpack browser | Free key from <https://console.curseforge.com/> |
+| Steam Web API key | ASE/Conan Workshop browser | Free key from <https://steamcommunity.com/dev/apikey> |
+| Discord webhook | State changes, crashes, backups, schedule events | A channel webhook URL |
+| pfSense | Per-server WAN port-forward management (create / fix / enable / disable / delete, WAN IP display) | The free [pfSense REST API package](https://pfrest.org/) on your router + an API key (System → REST API). Works with any pfSense — nothing is network-specific. Use the **Test connection** button to validate. |
+
+**CurseForge terms:** the mod browser uses the CurseForge API read-only to
+search and display mods; it never downloads or redistributes mod files — the
+game servers fetch mods themselves through official integrations. Bring your
+own key; keys are non-transferable under CurseForge's
+[3rd-party API terms](https://support.curseforge.com/en/support/solutions/articles/9000207405-curse-forge-3rd-party-api-terms-and-conditions).
+This repo does not ship one.
+
+## Reverse proxy / TLS
+
+The app is LAN-first but proxy-friendly:
+
+- Front it with Nginx Proxy Manager / Traefik / Caddy with TLS; proxy `/`,
+  `/api`, and `/socket.io` to the web port (container port 3000) — the web app
+  forwards API + websocket traffic internally.
+- Set `PUBLIC_BASE_URL` to the external origin.
+- The manager controls Docker via the host socket. If you expose the UI beyond
+  your LAN, strongly consider the socket-proxy setup above.
 
 ## Development
 
 ```bash
 pnpm install
 
-# generate a SECRETS_KEY + JWT_SECRET, then copy .env.example → .env
+# generate secrets, then copy .env.example → .env
 node -e "console.log('SECRETS_KEY=' + require('crypto').randomBytes(32).toString('hex'))"
 node -e "console.log('JWT_SECRET='  + require('crypto').randomBytes(32).toString('hex'))"
 
-# backend: generate the Prisma client + create the SQLite db
-pnpm --filter @ark/api db:push
-
-# run API (:8787) and web (:3000) together
-pnpm dev
+pnpm --filter @ark/api db:push   # create the dev SQLite db
+pnpm dev                         # API on :8787 + web on :3000
+pnpm --filter @ark/api test      # unit tests
 ```
 
-Run the config-engine unit tests:
-
-```bash
-pnpm --filter @ark/api test
-```
-
-## Deployment (Unraid)
-
-1. Install the manager via the [Unraid template](unraid/ark-manager.xml) (or
-   `docker-compose.yml`); mount `/var/run/docker.sock` and set `HOST_DATA_DIR`,
-   `SECRETS_KEY`, and `JWT_SECRET`. For least-privilege Docker access, front the
-   socket with a `tecnativa/docker-socket-proxy` and set `DOCKER_HOST` to it.
-2. Open the Web UI and complete the first-run wizard.
-
-> Game-server images (`docker/asa-server`, `docker/ase-server`) are built FROM a
-> proven community base (GE-Proton + SteamCMD). The exact base tag and Proton
-> invocation are finalized during Phase 1 testing against a real host.
-
-## Mods & the CurseForge API
-
-For **ARK: Survival Ascended**, the mod browser uses the CurseForge API **read-only** —
-only `GET /v1/mods/search` and `GET /v1/mods/{id}` to show a mod's name, author,
-description and thumbnail so you can pick mods for a server. **It never downloads or
-redistributes mod files** — the ARK dedicated server downloads mods itself, by mod ID,
-through CurseForge's official game integration. (ASE mods come from the Steam Workshop.)
-
-**Bring your own API key.** To use the ASA mod browser, supply **your own** CurseForge API
-key in the app's Settings (stored server-side, encrypted at rest) — apply for one at
-<https://console.curseforge.com/>. CurseForge API keys are non-transferable under their
-[3rd-party API terms](https://support.curseforge.com/en/support/solutions/articles/9000207405-curse-forge-3rd-party-api-terms-and-conditions);
-never share, embed, or commit them. This repo does not ship a key.
-
-## Reverse proxy / TLS
-
-The app is LAN-first but proxy-friendly. To expose it safely:
-
-- Put it behind Nginx Proxy Manager / Traefik with TLS; proxy `/`, `/api`, and
-  `/socket.io` to the web container (port 3000), which forwards `/api` + websockets
-  to the API.
-- Set `PUBLIC_BASE_URL` to the external origin.
-- Keep `SECRETS_KEY` / `JWT_SECRET` strong and private; secrets are encrypted at
-  rest. The manager controls Docker via the host socket — if you expose it beyond
-  your LAN, consider fronting Docker with a least-privilege socket-proxy.
-
-## Status
-
-All roadmap phases are implemented and verified (unit tests + live API exercise;
-Docker-runtime steps are validated against a real host):
-
-- **Phase 0** — monorepo scaffold, auth, encrypted secrets, socket-proxy, first-run wizard
-- **Phase 1** — ASA vertical slice: install → schema-driven config → create/start/stop with
-  the manager↔container contract (log-parse readiness, graceful shutdown, crash watchdog) →
-  live RCON → scheduler with pre-action snapshots
-- **Phase 2** — mods + CurseForge browser (load order, version pin, install-by-id)
-- **Phase 3** — clusters (shared transfer dir, members, coordinated start/stop)
-- **Phase 4** — ASE support (native runtime, Steam Workshop browser, game-aware mod routing)
-- **Phase 5** — backups (retention/restore), instance import, Discord/webhook notifications,
-  users/RBAC foundation, reverse-proxy hardening
-
-See [PLANNING.md](PLANNING.md) for the architecture and the deferred follow-ups.
+Monorepo layout: `packages/shared` (types + settings catalogs contract),
+`apps/api` (NestJS orchestrator), `apps/web` (Next.js UI), `docker/` (manager
+entrypoint), `unraid/` (CA template).
 
 ## License
 
-[MIT](LICENSE) © 2026 Jacob Neudorf. Not affiliated with Studio Wildcard, Overwolf, or CurseForge.
+[MIT](LICENSE) © 2026 Jacob Neudorf. Not affiliated with Studio Wildcard,
+Overwolf/CurseForge, Valve, Iron Gate, The Fun Pimps, Keen Games, RocketWerkz,
+Funcom, Pocketpair, Mojang, or Netgate.

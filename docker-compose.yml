@@ -12,7 +12,7 @@ name: ark-manager
 
 services:
   manager:
-    image: arkmanager/manager:latest
+    image: ghcr.io/shakes63/ark-server-manager:latest
     build:
       context: .
       dockerfile: Dockerfile
