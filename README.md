@@ -1,4 +1,6 @@
-# ARK Server Manager
+# Palisade
+
+> Formerly **ARK Server Manager** — it outgrew the name. Old repo links redirect.
 
 A self-hosted, Docker-based control panel for game dedicated servers — built
 Unraid-first, but it runs on any Linux box with Docker. One lean manager
@@ -46,7 +48,7 @@ See [PLANNING.md](PLANNING.md) for architecture details.
 ## Architecture at a glance
 
 ```
-ark-manager (this app) ──/var/run/docker.sock──> Docker daemon
+palisade (this app) ────/var/run/docker.sock──> Docker daemon
    Next.js UI + NestJS API                       │ spawns
    SQLite · config engine · RCON · scheduler     ▼
                                        one container per game server
@@ -91,24 +93,24 @@ manager injects config, watches logs, and talks RCON/telnet/query protocols.
 
 ```bash
 docker run -d \
-  --name ark-server-manager \
+  --name palisade \
   --network ark-net \
   --restart unless-stopped \
   -p 8970:3000 \
-  -v /opt/ark-manager:/data \
+  -v /opt/palisade:/data \
   -v /var/run/docker.sock:/var/run/docker.sock \
   --add-host host.docker.internal:host-gateway \
   -e NODE_ENV=production \
   -e DATA_DIR=/data \
   -e DATABASE_URL=file:/data/db.sqlite \
-  -e HOST_DATA_DIR=/opt/ark-manager \
+  -e HOST_DATA_DIR=/opt/palisade \
   -e PUBLIC_BASE_URL=http://YOUR-LAN-IP:8970 \
   -e SECRETS_KEY=<64 hex chars> \
   -e JWT_SECRET=<random string> \
   -e PUID=99 -e PGID=100 \
   -e TZ=America/Chicago \
   -e GAME_HOST_NETWORK=true \
-  ghcr.io/shakes63/ark-server-manager:latest
+  ghcr.io/shakes63/palisade:latest
 ```
 
 Then open `http://YOUR-LAN-IP:8970` and complete the first-run wizard
@@ -120,13 +122,13 @@ Settings).
 A reference [`docker-compose.yml`](docker-compose.yml) ships in the repo:
 
 ```bash
-export SECRETS_KEY=... JWT_SECRET=... HOST_DATA_DIR=/opt/ark-manager
+export SECRETS_KEY=... JWT_SECRET=... HOST_DATA_DIR=/opt/palisade
 docker compose up -d
 ```
 
 ### Option C — Unraid
 
-Use the [Community Applications template](unraid/ark-manager.xml): add it as a
+Use the [Community Applications template](unraid/palisade.xml): add it as a
 template, fill in the same variables, and the manager shows up as a normal
 Unraid Docker app (spawned game servers appear on the Docker page with proper
 icons and WebUI links back into the manager).
@@ -168,7 +170,7 @@ offers a browser download of the world saves first.
 ### Updating
 
 The image is rebuilt on every push to `main`
-(GitHub Actions → `ghcr.io/shakes63/ark-server-manager:latest`). To update:
+(GitHub Actions → `ghcr.io/shakes63/palisade:latest`). To update:
 pull the new image and recreate the container (Unraid's update button does
 both). Database migrations run automatically on boot.
 
@@ -221,7 +223,7 @@ entrypoint), `unraid/` (CA template).
 
 ## Acknowledgements
 
-This manager is a control plane — the actual game servers run on excellent
+Palisade is a control plane — the actual game servers run on excellent
 community-maintained images. Huge thanks to their maintainers; this project
 wouldn't exist without them:
 

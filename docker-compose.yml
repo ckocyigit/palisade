@@ -8,15 +8,15 @@
 # On Unraid, set HOST_DATA_DIR to the real appdata path so bind mounts for the
 # spawned game containers resolve correctly on the host, e.g.
 #   HOST_DATA_DIR=/mnt/user/appdata/ark-manager
-name: ark-manager
+name: palisade
 
 services:
   manager:
-    image: ghcr.io/shakes63/ark-server-manager:latest
+    image: ghcr.io/shakes63/palisade:latest
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: ark-manager
+    container_name: palisade
     environment:
       NODE_ENV: production
       API_PORT: 8787

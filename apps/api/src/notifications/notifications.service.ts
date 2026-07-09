@@ -55,7 +55,7 @@ export class NotificationsService implements OnModuleInit {
   async test(): Promise<{ sent: boolean }> {
     const url = await this.settings.get(SettingKeys.DiscordWebhook);
     if (!url) return { sent: false };
-    await this.post(url, "ARK Server Manager: webhook test ✅");
+    await this.post(url, "Palisade: webhook test ✅");
     return { sent: true };
   }
 }

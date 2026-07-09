@@ -35,7 +35,7 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           # Lowercase image name (GHCR requires lowercase); links to this repo.
-          images: ghcr.io/shakes63/ark-server-manager
+          images: ghcr.io/shakes63/palisade
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=ref,event=tag

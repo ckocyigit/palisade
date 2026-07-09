@@ -2,7 +2,7 @@
   "name": "@ark/api",
   "version": "0.1.0",
   "private": true,
-  "description": "ARK Server Manager backend (NestJS).",
+  "description": "Palisade backend (NestJS).",
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only -r tsconfig-paths/register src/main.ts",
     "build": "prisma generate && tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json",

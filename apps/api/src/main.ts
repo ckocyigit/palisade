@@ -23,7 +23,7 @@ async function bootstrap() {
 
   await app.listen(env.API_PORT, "0.0.0.0");
   new Logger("Bootstrap").log(
-    `ARK Server Manager API listening on :${env.API_PORT} (${env.NODE_ENV})`,
+    `Palisade API listening on :${env.API_PORT} (${env.NODE_ENV})`,
   );
 }
 

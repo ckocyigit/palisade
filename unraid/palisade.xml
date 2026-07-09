@@ -1,5 +1,5 @@
 <?xml version="1.0"?>
-<!-- Unraid template for the ARK Server Manager.
+<!-- Unraid template for Palisade (formerly ARK Server Manager).
      Controls Docker via the host socket mounted at /var/run/docker.sock. For
      least-privilege access instead, front Docker with a tecnativa/docker-socket-proxy
      on 'ark-net', set DOCKER_HOST to tcp://socket-proxy:2375, and drop the socket mount.
@@ -12,17 +12,18 @@
      (TZ is UTC; the in-app timezone picker drives scheduling + game clocks), so
      they are not configured here. -->
 <Container version="2">
-  <Name>ARK-Server-Manager</Name>
-  <Repository>ghcr.io/shakes63/ark-server-manager:latest</Repository>
-  <Registry>https://github.com/Shakes63/ark-server-manager/pkgs/container/ark-server-manager</Registry>
+  <Name>Palisade</Name>
+  <Repository>ghcr.io/shakes63/palisade:latest</Repository>
+  <Registry>https://github.com/Shakes63/palisade/pkgs/container/palisade</Registry>
   <Network>ark-net</Network>
   <Privileged>false</Privileged>
   <Support/>
   <Overview>
-    Web control panel for ARK: Survival Ascended (POK) and Survival Evolved
-    (hermsi) dedicated servers. Manages every setting, mods, clusters, live RCON,
-    and scheduled tasks, and spawns one container per game server. Controls Docker
-    through the host socket mounted at /var/run/docker.sock.
+    Palisade - a web control panel for game dedicated servers (ARK ASA/ASE, Conan,
+    Palworld, Minecraft Java + Bedrock, Icarus, Valheim, 7 Days to Die, Enshrouded).
+    Manages every setting, mods, backups, schedules, players, and port-forwards, and
+    spawns one container per game server. Controls Docker through the host socket
+    mounted at /var/run/docker.sock.
   </Overview>
   <Category>GameServers: Tools:</Category>
   <WebUI>http://[IP]:[PORT:3000]/</WebUI>

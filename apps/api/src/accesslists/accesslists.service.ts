@@ -112,7 +112,7 @@ export class AccessListsService {
   private async putValheim(id: string, key: AccessListKey, entries: string[]): Promise<void> {
     const file = this.valheimFile(id, key);
     await mkdir(dirname(file), { recursive: true });
-    const header = "// Managed by ARK Server Manager — one SteamID64 per line\n";
+    const header = "// Managed by Palisade — one SteamID64 per line\n";
     await writeFile(file, header + entries.join("\n") + (entries.length ? "\n" : ""), "utf8");
   }
 
@@ -227,7 +227,7 @@ export class AccessListsService {
       return `    <${tag} platform="${esc(platform)}" userid="${esc(userid)}" ${extra}/>`;
     };
     const xml = `<?xml version="1.0" encoding="UTF-8"?>
-<!-- Managed by ARK Server Manager -->
+<!-- Managed by Palisade -->
 <adminTools>
   <users>
 ${next.admins.map((e) => line(e, "user", 'name="" permission_level="0"')).join("\n")}

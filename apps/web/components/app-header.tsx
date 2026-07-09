@@ -15,7 +15,7 @@ export function AppHeader() {
         <div className="flex items-center gap-6">
           <Link href="/" className="flex items-center gap-2 font-semibold text-slate-100">
             <Server className="h-5 w-5 text-ark-accent" />
-            ARK Server Manager
+            Palisade
           </Link>
           {token && (
             <nav className="flex items-center gap-4 text-sm text-slate-400">

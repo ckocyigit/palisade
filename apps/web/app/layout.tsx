@@ -4,8 +4,8 @@ import { AuthProvider } from "@/lib/auth";
 import { AppHeader } from "@/components/app-header";
 
 export const metadata: Metadata = {
-  title: "ARK Server Manager",
-  description: "Manage ARK: Survival Ascended / Evolved dedicated servers.",
+  title: "Palisade",
+  description: "Self-hosted control panel for game dedicated servers.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
