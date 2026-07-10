@@ -20,6 +20,11 @@ const ACTIONS: { value: string; label: string; hint: string }[] = [
   { value: "restart", label: "Restart", hint: "Stop and start (clears memory creep)." },
   { value: "backup", label: "Backup", hint: "Take a world snapshot." },
   { value: "update", label: "Update", hint: "Update game files, then restart." },
+  {
+    value: "update-if-available",
+    label: "Update if available",
+    hint: "Check Steam for a new build first — update + restart only when one exists (no downtime otherwise).",
+  },
   { value: "stop", label: "Stop", hint: "Shut the server down." },
   { value: "start", label: "Start", hint: "Bring the server up." },
 ];
@@ -31,7 +36,7 @@ const FREQS: { value: Frequency; label: string }[] = [
   { value: "everyN", label: "Every few hours" },
 ];
 const DAYS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
-const DISRUPTIVE = new Set(["restart", "update", "stop"]);
+const DISRUPTIVE = new Set(["restart", "update", "update-if-available", "stop"]);
 const actionLabel = (a: string) => ACTIONS.find((x) => x.value === a)?.label ?? a;
 
 export function ScheduleList({ serverId }: { serverId: string }) {

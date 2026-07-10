@@ -9,6 +9,7 @@ import { InstallerService } from "../installer/installer.service";
 import { BackupsService } from "../backups/backups.service";
 import { ManagerSettingsService } from "../manager-settings/manager-settings.service";
 import { PlayersService } from "../players/players.service";
+import { UpdatesService } from "../updates/updates.service";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -31,6 +32,7 @@ export class SchedulerService implements OnModuleInit {
     private readonly backups: BackupsService,
     private readonly settings: ManagerSettingsService,
     private readonly players: PlayersService,
+    private readonly updates: UpdatesService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -123,7 +125,25 @@ export class SchedulerService implements OnModuleInit {
       serverId: sched.serverId,
     });
 
-    const disruptive = ["restart", "update", "stop"].includes(sched.action);
+    // "update-if-available" is an update that first checks Steam for a newer
+    // build — no players warned, no downtime, no backup churn when already
+    // current. Unknown (non-Steam game / API down) falls through to updating,
+    // so the schedule can never go permanently dead on a detection failure.
+    let action = sched.action;
+    if (action === "update-if-available") {
+      const outdated = await this.updates.isOutdated(sched.serverId).catch(() => null);
+      if (outdated === false) {
+        await this.events.emit({
+          type: EventType.ScheduleFired,
+          message: `Schedule "${sched.name}" skipped — already on the latest build`,
+          serverId: sched.serverId,
+        });
+        return;
+      }
+      action = "update";
+    }
+
+    const disruptive = ["restart", "update", "stop"].includes(action);
     try {
       if (disruptive && sched.skipIfPlayersOnline) {
         // Don't interrupt a live session: skip this firing when anyone is online.
@@ -140,9 +160,9 @@ export class SchedulerService implements OnModuleInit {
       }
       if (disruptive) {
         await this.warnCountdown(sched.serverId, sched.warnMinutes);
-        await this.backups.create(sched.serverId, `pre-${sched.action}`).catch(() => undefined);
+        await this.backups.create(sched.serverId, `pre-${action}`).catch(() => undefined);
       }
-      switch (sched.action) {
+      switch (action) {
         case "restart":
           await this.servers.restart(sched.serverId);
           break;

@@ -91,6 +91,22 @@ export class UpdatesService implements OnModuleInit {
     }
   }
 
+  /** Live check for one server: newest public build vs the installed .acf.
+   *  Returns null when it can't tell — non-Steam game, no manifest yet, or the
+   *  build API is unreachable (falling back to the stored 3-hourly flag). */
+  async isOutdated(serverId: string): Promise<boolean | null> {
+    const server = await this.prisma.server.findUnique({ where: { id: serverId } });
+    if (!server) return null;
+    const game = server.game as Game;
+    if (!STEAM_APP_ID[game]) return null;
+    const [newest, installed] = await Promise.all([
+      this.latestBuildId(game),
+      this.installedBuildId(serverId, game),
+    ]);
+    if (newest === null || installed === null) return server.updateAvailable ?? null;
+    return newest > installed;
+  }
+
   private async latestBuildId(game: Game): Promise<number | null> {
     const appId = STEAM_APP_ID[game];
     const ctrl = new AbortController();
