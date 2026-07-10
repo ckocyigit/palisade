@@ -1,13 +1,16 @@
 import { Body, Controller, Delete, Get, Param, Post } from "@nestjs/common";
-import { IsOptional, IsString, MinLength } from "class-validator";
+import { IsIn, IsOptional, IsString, MinLength } from "class-validator";
+import { ROLES, type Role } from "@ark/shared";
 import { AuthService } from "./auth.service";
+import { MinRole } from "./min-role.decorator";
 
 class CreateUserBody {
   @IsString() username!: string;
   @IsString() @MinLength(8) password!: string;
-  @IsOptional() @IsString() role?: string;
+  @IsOptional() @IsIn(ROLES) role?: Role;
 }
 
+@MinRole("admin")
 @Controller("users")
 export class UsersController {
   constructor(private readonly auth: AuthService) {}

@@ -11,6 +11,7 @@ import {
 } from "class-validator";
 import { EventType, type NotificationKind } from "@ark/shared";
 import { NotificationsService } from "./notifications.service";
+import { MinRole } from "../auth/min-role.decorator";
 
 class TargetDto {
   @IsString() @MaxLength(64) id!: string;
@@ -25,6 +26,7 @@ class PutTargetsBody {
   @IsArray() @ValidateNested({ each: true }) @Type(() => TargetDto) targets!: TargetDto[];
 }
 
+@MinRole("admin")
 @Controller("notifications")
 export class NotificationsController {
   constructor(private readonly notifications: NotificationsService) {}

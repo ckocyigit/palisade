@@ -3,6 +3,7 @@ import { ModuleRef } from "@nestjs/core";
 import { IsBoolean, IsInt, IsOptional, IsString, Max, Min } from "class-validator";
 import { ManagerSettingsService, SettingKeys } from "./manager-settings.service";
 import { SchedulerService } from "../scheduler/scheduler.service";
+import { MinRole } from "../auth/min-role.decorator";
 
 class UpdateSettingsBody {
   @IsOptional() @IsString() timezone?: string;
@@ -30,6 +31,7 @@ export class ManagerSettingsController {
     return this.settings.publicView();
   }
 
+  @MinRole("admin")
   @Patch()
   async update(@Body() body: UpdateSettingsBody) {
     if (body.timezone) {

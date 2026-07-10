@@ -4,9 +4,11 @@ import { Logo } from "@/components/logo";
 import { usePathname } from "next/navigation";
 import { LogOut, Boxes, Settings } from "lucide-react";
 import { useAuth } from "@/lib/auth";
+import { useRole } from "@/lib/use-role";
 
 export function AppHeader() {
   const { token, logout } = useAuth();
+  const role = useRole();
   const pathname = usePathname();
   if (pathname === "/login" || pathname === "/setup") return null;
 
@@ -26,9 +28,11 @@ export function AppHeader() {
               <Link href="/clusters" className="flex items-center gap-1 hover:text-slate-200">
                 <Boxes className="h-4 w-4" /> Clusters
               </Link>
-              <Link href="/settings" className="flex items-center gap-1 hover:text-slate-200">
-                <Settings className="h-4 w-4" /> Settings
-              </Link>
+              {role === "admin" && (
+                <Link href="/settings" className="flex items-center gap-1 hover:text-slate-200">
+                  <Settings className="h-4 w-4" /> Settings
+                </Link>
+              )}
             </nav>
           )}
         </div>

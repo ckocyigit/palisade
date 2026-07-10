@@ -176,3 +176,10 @@ export interface RealtimeMessage<T = unknown> {
   payload: T;
   at: string;
 }
+
+/** User roles, least → most privileged. Viewer = read-only, operator = day-to-day
+ *  server ops (start/stop/console/backups/mods/schedules), admin = everything
+ *  (settings, users, notifications, replication, deletes). */
+export type Role = "viewer" | "operator" | "admin";
+export const ROLE_RANK: Record<Role, number> = { viewer: 0, operator: 1, admin: 2 };
+export const ROLES: Role[] = ["viewer", "operator", "admin"];

@@ -1,8 +1,10 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from "@nestjs/common";
 import { IsBoolean, IsIn, IsInt } from "class-validator";
 import { PortForwardsService } from "./portforwards.service";
+import { MinRole } from "../auth/min-role.decorator";
 
 /** Settings-scoped pfSense utilities (not tied to a server). */
+@MinRole("admin")
 @Controller("pfsense")
 export class PfsenseController {
   constructor(private readonly portforwards: PortForwardsService) {}

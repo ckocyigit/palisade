@@ -73,9 +73,9 @@ export class AuthService {
     return { ok: true };
   }
 
-  private sign(user: { id: string; username: string; tokenVersion: number }): Promise<string> {
+  private sign(user: { id: string; username: string; role: string; tokenVersion: number }): Promise<string> {
     return this.jwt.signAsync(
-      { sub: user.id, username: user.username, role: "admin", ver: user.tokenVersion },
+      { sub: user.id, username: user.username, role: user.role, ver: user.tokenVersion },
       { expiresIn: "7d" },
     );
   }

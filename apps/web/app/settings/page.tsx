@@ -5,6 +5,7 @@ import { apiGet, apiPatch, apiPost } from "@/lib/api";
 import { TimezoneSelect, detectZone } from "@/components/timezone-select";
 import { NotificationTargetsCard } from "@/components/notification-targets";
 import { ReplicationCard } from "@/components/replication-card";
+import { UsersCard } from "@/components/users-card";
 
 type SettingsView = Record<string, string | boolean>;
 
@@ -102,6 +103,8 @@ export default function SettingsPage() {
           configured={configured("steam_web_api_key")}
         />
       </div>
+
+      <UsersCard />
 
       <NotificationTargetsCard />
 

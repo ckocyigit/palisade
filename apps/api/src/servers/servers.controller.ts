@@ -21,6 +21,7 @@ import { ServersService } from "./servers.service";
 import { HistoryService } from "./history.service";
 import { EventsService } from "../events/events.service";
 import { CreateServerBody, UpdateServerBody } from "./servers.dto";
+import { MinRole } from "../auth/min-role.decorator";
 
 class CopyServerBody {
   @IsArray() @IsString({ each: true }) targetIds!: string[];
@@ -121,6 +122,7 @@ export class ServersController {
   }
 
   /** Delete the server. ?wipe=0 keeps the on-disk game data + backups (default wipes). */
+  @MinRole("admin")
   @Delete(":id")
   remove(@Param("id") id: string, @Query("wipe") wipe?: string) {
     return this.servers.remove(id, { wipeFiles: wipe !== "0" && wipe !== "false" });

@@ -6,6 +6,7 @@ import { AuthController } from "./auth.controller";
 import { UsersController } from "./users.controller";
 import { AuthService } from "./auth.service";
 import { JwtAuthGuard } from "./jwt-auth.guard";
+import { RolesGuard } from "./roles.guard";
 import { AuthThrottlerGuard } from "./auth-throttler.guard";
 import { loadEnv } from "../config/env";
 
@@ -23,8 +24,11 @@ import { loadEnv } from "../config/env";
   providers: [
     AuthService,
     AuthThrottlerGuard,
-    // Protect every route by default; opt out with @Public().
+    // Protect every route by default; opt out with @Public(). RolesGuard layers
+    // on top (registration order matters — it reads req.user set by the JWT guard):
+    // GET = any role, mutations = operator+, @MinRole overrides per route.
     { provide: APP_GUARD, useClass: JwtAuthGuard },
+    { provide: APP_GUARD, useClass: RolesGuard },
   ],
   exports: [AuthService],
 })

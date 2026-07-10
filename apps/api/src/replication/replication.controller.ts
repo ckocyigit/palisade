@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Post, Put } from "@nestjs/common";
 import { IsBoolean, IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from "class-validator";
 import { ReplicationService, type ReplicationConfig } from "./replication.service";
+import { MinRole } from "../auth/min-role.decorator";
 
 class ReplicationBody {
   @IsBoolean() enabled!: boolean;
@@ -14,6 +15,7 @@ class ReplicationBody {
   @IsOptional() @IsString() @MaxLength(20000) privateKey?: string;
 }
 
+@MinRole("admin")
 @Controller("replication")
 export class ReplicationController {
   constructor(private readonly replication: ReplicationService) {}
