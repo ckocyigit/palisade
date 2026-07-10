@@ -43,7 +43,7 @@ export class AuthService {
       await this.settings.set(SettingKeys.SteamWebApiKey, dto.steamWebApiKey);
     await this.settings.markInitialized();
 
-    return { token: await this.sign(user.id, user.username) };
+    return { token: await this.sign(user) };
   }
 
   async login(dto: LoginDto): Promise<{ token: string }> {
@@ -51,11 +51,33 @@ export class AuthService {
     if (!user) throw new UnauthorizedException("Invalid credentials");
     const ok = await bcrypt.compare(dto.password, user.passwordHash);
     if (!ok) throw new UnauthorizedException("Invalid credentials");
-    return { token: await this.sign(user.id, user.username) };
+    return { token: await this.sign(user) };
   }
 
-  private sign(sub: string, username: string): Promise<string> {
-    return this.jwt.signAsync({ sub, username, role: "admin" }, { expiresIn: "30d" });
+  /** Reject tokens whose `ver` claim no longer matches the user's tokenVersion. */
+  async isTokenCurrent(sub: unknown, ver: unknown): Promise<boolean> {
+    if (typeof sub !== "string" || typeof ver !== "number") return false;
+    const user = await this.prisma.user.findUnique({
+      where: { id: sub },
+      select: { tokenVersion: true },
+    });
+    return user !== null && user.tokenVersion === ver;
+  }
+
+  /** Invalidate every outstanding token for this user. */
+  async logoutAll(userId: string): Promise<{ ok: true }> {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { tokenVersion: { increment: 1 } },
+    });
+    return { ok: true };
+  }
+
+  private sign(user: { id: string; username: string; tokenVersion: number }): Promise<string> {
+    return this.jwt.signAsync(
+      { sub: user.id, username: user.username, role: "admin", ver: user.tokenVersion },
+      { expiresIn: "7d" },
+    );
   }
 
   // ── User management (foundation for multi-user / RBAC) ─────────────────────

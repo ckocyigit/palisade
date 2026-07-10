@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Post, Req, UseGuards } from "@nestjs/common";
 import { AuthService } from "./auth.service";
 import { Public } from "./public.decorator";
 import { AuthThrottlerGuard } from "./auth-throttler.guard";
@@ -27,5 +27,11 @@ export class AuthController {
   @Post("login")
   login(@Body() body: LoginBody) {
     return this.auth.login(body);
+  }
+
+  /** Invalidate every outstanding token for the calling user (bumps tokenVersion). */
+  @Post("logout-all")
+  logoutAll(@Req() req: { user: { sub: string } }) {
+    return this.auth.logoutAll(req.user.sub);
   }
 }

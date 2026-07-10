@@ -1,12 +1,15 @@
 import { Logger } from "@nestjs/common";
+import { JwtService } from "@nestjs/jwt";
 import {
   OnGatewayConnection,
   OnGatewayDisconnect,
+  OnGatewayInit,
   WebSocketGateway,
   WebSocketServer,
 } from "@nestjs/websockets";
 import { Server, Socket } from "socket.io";
 import type { RealtimeMessage } from "@ark/shared";
+import { AuthService } from "../auth/auth.service";
 
 /**
  * Socket.IO gateway for live status, log tails, install progress, RCON output,
@@ -16,11 +19,36 @@ import type { RealtimeMessage } from "@ark/shared";
 // strips the trailing slash from `/socket.io/`; without it the polling
 // handshake 404s behind the single-origin proxy.
 @WebSocketGateway({ cors: { origin: true, credentials: true }, addTrailingSlash: false })
-export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect {
+export class RealtimeGateway
+  implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
+{
   private readonly logger = new Logger(RealtimeGateway.name);
 
   @WebSocketServer()
   server!: Server;
+
+  constructor(
+    private readonly jwt: JwtService,
+    private readonly auth: AuthService,
+  ) {}
+
+  /** Realtime traffic includes log tails and RCON output — require a valid,
+   * unrevoked JWT in the socket.io handshake before any message flows. */
+  afterInit(server: Server): void {
+    server.use(async (socket, next) => {
+      try {
+        const token = socket.handshake.auth?.token as string | undefined;
+        if (!token) return next(new Error("unauthorized"));
+        const payload = await this.jwt.verifyAsync(token);
+        if (!(await this.auth.isTokenCurrent(payload.sub, payload.ver))) {
+          return next(new Error("unauthorized"));
+        }
+        next();
+      } catch {
+        next(new Error("unauthorized"));
+      }
+    });
+  }
 
   handleConnection(_client: Socket): void {
     // No per-server rooms: clients receive every message and filter by

@@ -16,6 +16,8 @@ model User {
   username     String   @unique
   passwordHash String
   role         String   @default("admin")
+  /// Bumped to invalidate every outstanding JWT for this user (logout-all).
+  tokenVersion Int      @default(0)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }

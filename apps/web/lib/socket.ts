@@ -2,6 +2,7 @@
 import { useEffect, useRef } from "react";
 import { io, type Socket } from "socket.io-client";
 import type { RealtimeMessage } from "@ark/shared";
+import { getToken } from "./api";
 
 /**
  * Subscribe to realtime messages, optionally scoped to one server. Returns
@@ -17,6 +18,7 @@ export function useRealtime(
   useEffect(() => {
     const socket: Socket = io({
       path: "/socket.io",
+      auth: { token: getToken() ?? "" },
       query: serverId ? { serverId } : undefined,
       // HTTP long-polling proxies cleanly through the Next.js rewrite; a raw
       // WebSocket upgrade does not (Next rewrites don't proxy WS), so polling is
