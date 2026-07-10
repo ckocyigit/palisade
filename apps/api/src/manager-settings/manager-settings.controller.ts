@@ -16,6 +16,9 @@ class UpdateSettingsBody {
   @IsOptional() @IsString() pfsenseTargetIp?: string;
 }
 
+// Even the "public" view exposes infrastructure config (pfSense host, data dir),
+// and only the admin-only Settings page consumes it.
+@MinRole("admin")
 @Controller("settings")
 export class ManagerSettingsController {
   constructor(
