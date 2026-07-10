@@ -14,7 +14,10 @@ ENV PNPM_HOME=/pnpm PATH=/pnpm:$PATH
 # slim image omits them, which otherwise breaks `prisma migrate deploy` on boot).
 # sqlite3 is used to take consistent online backups of Conan's live world database;
 # unzip extracts uploaded Palworld .pak/framework archives into the instance dir.
+# The upgrade keeps Debian security fixes flowing despite the digest-pinned
+# base (Trivy blocks the publish on CRITICAL CVEs, so a stale base fails CI).
 RUN apt-get update \
+  && apt-get upgrade -y \
   && apt-get install -y --no-install-recommends openssl ca-certificates sqlite3 unzip \
   && rm -rf /var/lib/apt/lists/*
 RUN corepack enable
