@@ -194,10 +194,13 @@ offers a browser download of the world saves first.
 
 ### Updating
 
-The image is rebuilt on every push to `main`
-(GitHub Actions → `ghcr.io/shakes63/palisade:latest`). To update:
-pull the new image and recreate the container (Unraid's update button does
-both). Database migrations run automatically on boot.
+Releases are versioned: every `vX.Y.Z` tag builds and publishes
+`ghcr.io/shakes63/palisade:latest` plus matching `vX.Y.Z` / `vX.Y` tags (see
+[Releases](https://github.com/Shakes63/palisade/releases) for changelogs). To
+update: pull the new image and recreate the container (Unraid's update button
+does both). Database migrations run automatically on boot. Prefer a fixed
+version over `latest`? Point the template at a specific `vX.Y.Z` tag — any
+published release remains pullable as a rollback pin.
 
 ---
 

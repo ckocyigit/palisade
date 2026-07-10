@@ -1,15 +1,16 @@
 name: Build and publish Docker image
 
 # Builds the manager image and pushes it to GitHub Container Registry (GHCR) so
-# Unraid can pull it and surface the built-in "update" button. Tagged `latest`
-# on main, plus a short-sha tag and semver tags on `vX.Y.Z` releases.
+# Unraid can pull it and surface the built-in "update" button. Publishes ONLY on
+# vX.Y.Z tags (a release IS the deploy) — every release gets `latest`, the
+# semver tags, and a short-sha tag, so any prior version stays pullable as a
+# rollback pin. Plain pushes to main do not build.
 #
 # Security gates: the dependency audit must pass (no high/critical prod vulns)
 # before the image builds, and the built image is Trivy-scanned for CRITICAL
 # OS/library vulnerabilities before it is pushed.
 on:
   push:
-    branches: [main]
     tags: ["v*"]
   workflow_dispatch:
 
@@ -54,8 +55,9 @@ jobs:
           # Lowercase image name (GHCR requires lowercase); links to this repo.
           images: ghcr.io/shakes63/palisade
           tags: |
-            type=raw,value=latest,enable={{is_default_branch}}
-            type=ref,event=tag
+            type=raw,value=latest
+            type=semver,pattern=v{{version}}
+            type=semver,pattern=v{{major}}.{{minor}}
             type=sha,format=short
 
       - name: Build (amd64 — Unraid), load for scanning
