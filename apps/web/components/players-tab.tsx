@@ -10,11 +10,14 @@ interface SeenPlayer {
   firstSeenAt: string;
   lastSeenAt: string;
   online: boolean;
+  playtimeMinutes: number;
 }
 interface View {
   players: SeenPlayer[];
   supportedActions: PlayerAction[];
   captureNote: string;
+  hourCounts: number[];
+  playtimeTracked: boolean;
 }
 
 const ACTION_META: Record<PlayerAction, { label: string; icon: typeof Gavel; danger?: boolean; title: string }> = {
@@ -31,6 +34,41 @@ const ago = (iso: string) => {
   if (s < 86400) return `${Math.round(s / 3600)}h ago`;
   return `${Math.round(s / 86400)}d ago`;
 };
+
+const playtime = (minutes: number) => {
+  if (minutes < 60) return `${minutes}m`;
+  if (minutes < 60 * 48) return `${(minutes / 60).toFixed(1)}h`;
+  return `${Math.round(minutes / 60)}h`;
+};
+
+/** Peak-hours strip: the server's UTC histogram rotated into the browser's timezone. */
+function HourHeatmap({ utcCounts }: { utcCounts: number[] }) {
+  const offsetHours = Math.round(-new Date().getTimezoneOffset() / 60);
+  const local = Array.from({ length: 24 }, (_, h) => utcCounts[(((h - offsetHours) % 24) + 24) % 24] ?? 0);
+  const max = Math.max(...local, 1);
+  return (
+    <div className="card space-y-1 py-3">
+      <p className="text-xs font-medium text-slate-400">Activity by hour (your time)</p>
+      <div className="flex items-end gap-[2px]">
+        {local.map((n, h) => (
+          <div key={h} className="flex-1" title={`${String(h).padStart(2, "0")}:00 — ${n} player-minute${n === 1 ? "" : "s"}`}>
+            <div
+              className="w-full rounded-sm bg-ark-accent"
+              style={{ height: `${4 + Math.round((n / max) * 28)}px`, opacity: n === 0 ? 0.12 : 0.35 + 0.65 * (n / max) }}
+            />
+          </div>
+        ))}
+      </div>
+      <div className="flex justify-between text-[10px] text-slate-600">
+        <span>00</span>
+        <span>06</span>
+        <span>12</span>
+        <span>18</span>
+        <span>23</span>
+      </div>
+    </div>
+  );
+}
 
 /**
  * Everyone who has played on this server — captured from the game's own player
@@ -90,6 +128,10 @@ export function PlayersTab({ serverId }: { serverId: string }) {
       {msg && <div className="card border-ark-accent/40 py-2 text-sm text-slate-200">{msg}</div>}
       {err && <div className="card border-rose-500/40 py-2 text-sm text-rose-300">{err}</div>}
 
+      {view.playtimeTracked && view.hourCounts.some((n) => n > 0) && (
+        <HourHeatmap utcCounts={view.hourCounts} />
+      )}
+
       {view.players.length === 0 ? (
         <div className="card text-slate-400">
           Nobody yet — players are recorded automatically when they join (name + platform id where the
@@ -109,6 +151,7 @@ export function PlayersTab({ serverId }: { serverId: string }) {
                   {p.playerId ? <span className="font-mono">{p.playerId}</span> : "no platform id yet"} ·{" "}
                   {p.online ? "online now" : `last seen ${ago(p.lastSeenAt)}`} · first{" "}
                   {new Date(p.firstSeenAt).toLocaleDateString()}
+                  {view.playtimeTracked && p.playtimeMinutes > 0 && <> · {playtime(p.playtimeMinutes)} played</>}
                 </div>
               </div>
               <div className="flex shrink-0 flex-wrap gap-1.5">

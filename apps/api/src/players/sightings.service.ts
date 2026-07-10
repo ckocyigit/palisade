@@ -17,12 +17,25 @@ export type PlayerAction =
   | "whitelist"
   | "admin";
 
+/** Parse a stored 24-slot histogram, tolerating legacy "[]" and bad JSON. */
+export function parseHourCounts(json: string | null | undefined): number[] {
+  try {
+    const arr = JSON.parse(json || "[]") as number[];
+    if (Array.isArray(arr) && arr.length === 24) return arr.map((n) => (Number.isFinite(n) ? n : 0));
+  } catch {
+    /* fall through to a fresh histogram */
+  }
+  return new Array<number>(24).fill(0);
+}
+
 export interface SeenPlayer {
   name: string;
   playerId: string | null;
   firstSeenAt: string;
   lastSeenAt: string;
   online: boolean;
+  /** Minutes of measured presence (0 on games without a live player list). */
+  playtimeMinutes: number;
 }
 
 export interface PlayersView {
@@ -31,6 +44,10 @@ export interface PlayersView {
   supportedActions: PlayerAction[];
   /** How sightings are captured for this game (shown as a hint). */
   captureNote: string;
+  /** Server-wide hour-of-day activity histogram (24 ints, UTC hours). */
+  hourCounts: number[];
+  /** Whether playtime is measured for this game (live player-list poll). */
+  playtimeTracked: boolean;
 }
 
 /** Games whose player list is polled over RCON/telnet (needs the admin password). */
@@ -131,7 +148,8 @@ export class SightingsService implements OnModuleInit {
       if (!RCON_POLL_GAMES.has(game) || !s.adminPasswordEnc) continue;
       try {
         const players = await this.listDetailed(s.id, game);
-        for (const p of players) await this.upsert(s.id, p.name, p.playerId);
+        // tick=true: each poll pass counts one minute of presence per player.
+        for (const p of players) await this.upsert(s.id, p.name, p.playerId, true);
         // Leave detection: only the polled games have a reliable heartbeat, so a
         // name present last poll but not this one really did disconnect.
         const current = new Set(players.map((p) => p.name).filter(Boolean));
@@ -260,20 +278,31 @@ export class SightingsService implements OnModuleInit {
     }
   }
 
-  private async upsert(serverId: string, name: string, playerId?: string): Promise<void> {
+  private async upsert(serverId: string, name: string, playerId?: string, tick = false): Promise<void> {
     if (!name) return;
     // A sighting after a stale (or absent) lastSeen means the player just came
     // online — both capture paths (RCON poll + join log lines) land here.
     const prev = await this.prisma.playerSighting
-      .findUnique({ where: { serverId_name: { serverId, name } }, select: { lastSeenAt: true } })
+      .findUnique({
+        where: { serverId_name: { serverId, name } },
+        select: { lastSeenAt: true, hourCountsJson: true },
+      })
       .catch(() => null);
     const wasOnline = prev !== null && Date.now() - prev.lastSeenAt.getTime() < ONLINE_WINDOW_MS;
+    // tick = one measured minute of presence (poll path only): bump the total
+    // and the UTC hour-of-day histogram that feeds the peak-hours heatmap.
+    let counters = {};
+    if (tick) {
+      const hours = parseHourCounts(prev?.hourCountsJson);
+      hours[new Date().getUTCHours()]!++;
+      counters = { minutesPlayed: { increment: 1 }, hourCountsJson: JSON.stringify(hours) };
+    }
     await this.prisma.playerSighting
       .upsert({
         where: { serverId_name: { serverId, name } },
         create: { serverId, name, playerId: playerId ?? null },
         // Never blank out a known platform id with a later id-less sighting.
-        update: { lastSeenAt: new Date(), ...(playerId ? { playerId } : {}) },
+        update: { lastSeenAt: new Date(), ...(playerId ? { playerId } : {}), ...counters },
       })
       .catch(() => undefined); // e.g. server deleted mid-flight
     if (!wasOnline) {
@@ -293,6 +322,11 @@ export class SightingsService implements OnModuleInit {
       orderBy: { lastSeenAt: "desc" },
     });
     const running = server.state === ServerState.Running;
+    // Server-wide peak-hours histogram = sum of every player's histogram.
+    const hourCounts = new Array<number>(24).fill(0);
+    for (const r of rows) {
+      parseHourCounts(r.hourCountsJson).forEach((n, h) => (hourCounts[h]! += n));
+    }
     return {
       players: rows.map((r) => ({
         name: r.name,
@@ -300,11 +334,14 @@ export class SightingsService implements OnModuleInit {
         firstSeenAt: r.firstSeenAt.toISOString(),
         lastSeenAt: r.lastSeenAt.toISOString(),
         online: running && Date.now() - r.lastSeenAt.getTime() < ONLINE_WINDOW_MS,
+        playtimeMinutes: r.minutesPlayed,
       })),
       supportedActions: ACTIONS_BY_GAME[game],
       captureNote:
         CAPTURE_NOTES[game] ??
         "Captured from the live player list every minute while the server runs.",
+      hourCounts,
+      playtimeTracked: RCON_POLL_GAMES.has(game),
     };
   }
 

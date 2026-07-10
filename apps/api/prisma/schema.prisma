@@ -194,6 +194,10 @@ model PlayerSighting {
   playerId    String?
   firstSeenAt DateTime @default(now())
   lastSeenAt  DateTime @default(now())
+  // Playtime analytics, fed by the 60s player-list poll (games with a live
+  // player list only — log-line-captured games can't measure presence).
+  minutesPlayed  Int    @default(0)
+  hourCountsJson String @default("[]") // 24 ints, UTC hour-of-day histogram
 
   @@unique([serverId, name])
 }
