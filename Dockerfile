@@ -31,10 +31,19 @@ COPY apps/api/package.json apps/api/
 COPY apps/web/package.json apps/web/
 RUN pnpm install --frozen-lockfile || pnpm install
 
-# --- prodmods: node_modules + the generated Prisma client, with NO app source.
-# Cached unless deps or the Prisma schema change, so the runtime's node_modules
-# layer stays byte-identical across code-only updates (= not re-pulled).
-FROM deps AS prodmods
+# --- prodmods: PROD-ONLY node_modules + the generated Prisma client, with NO
+# app source. A fresh --prod install (not a prune of the deps stage — pnpm
+# leaves orphans in .pnpm on reconcile) keeps dev toolchains like vitest/vite/
+# esbuild out of the runtime image entirely. Cached unless deps or the Prisma
+# schema change, so the runtime's node_modules layer stays byte-identical
+# across code-only updates (= not re-pulled). The prisma CLI is a production
+# dependency: generate runs here and `migrate deploy` runs at boot.
+FROM base AS prodmods
+COPY pnpm-workspace.yaml package.json pnpm-lock.yaml* ./
+COPY packages/shared/package.json packages/shared/
+COPY apps/api/package.json apps/api/
+COPY apps/web/package.json apps/web/
+RUN pnpm install --prod --frozen-lockfile
 COPY apps/api/prisma apps/api/prisma
 RUN cd apps/api && pnpm exec prisma generate
 
