@@ -4,6 +4,7 @@ import { Save, KeyRound, Send, CheckCircle2, Circle } from "lucide-react";
 import { apiGet, apiPatch, apiPost } from "@/lib/api";
 import { TimezoneSelect, detectZone } from "@/components/timezone-select";
 import { NotificationTargetsCard } from "@/components/notification-targets";
+import { ReplicationCard } from "@/components/replication-card";
 
 type SettingsView = Record<string, string | boolean>;
 
@@ -174,6 +175,8 @@ export default function SettingsPage() {
           </p>
         </div>
       </div>
+
+      <ReplicationCard />
 
       <div className="card space-y-3">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-ark-accent2">Start guard</h2>

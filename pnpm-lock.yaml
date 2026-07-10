@@ -85,6 +85,9 @@ importers:
       socket.io:
         specifier: ^4.8.1
         version: 4.8.3
+      ssh2:
+        specifier: ^1.17.0
+        version: 1.17.0
       zod:
         specifier: ^3.23.8
         version: 3.25.76
@@ -104,6 +107,9 @@ importers:
       '@types/node-cron':
         specifier: ^3.0.11
         version: 3.0.11
+      '@types/ssh2':
+        specifier: ^1.15.5
+        version: 1.15.5
       ts-node:
         specifier: ^10.9.2
         version: 10.9.2(@types/node@20.19.43)(typescript@5.9.3)
