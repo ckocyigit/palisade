@@ -1328,8 +1328,10 @@ export class ServersService implements OnApplicationBootstrap {
     const game = server.game as Game;
     // Env-driven images build their own config (Minecraft/Bedrock → server.properties,
     // Icarus → ServerSettings.ini, Valheim → launch args, Enshrouded → enshrouded_server.json,
-    // V Rising → HOST/GAME_SETTINGS env patching its JSONs, Core Keeper/Rust/BeamMP →
-    // pure env) — nothing to render.
+    // V Rising → HOST/GAME_SETTINGS env patching its JSONs, Palworld → PalWorldSettings.ini
+    // from env, Core Keeper/Rust/BeamMP → pure env) — nothing to render. Anything missing
+    // from this list falls through to the ARK INI renderer at the bottom and gets junk
+    // GameUserSettings.ini/Game.ini files (guarded by lifecycle.e2e.test.ts).
     if (
       game === Game.MINECRAFT ||
       game === Game.ICARUS ||
@@ -1337,6 +1339,8 @@ export class ServersService implements OnApplicationBootstrap {
       game === Game.VALHEIM ||
       game === Game.ENSHROUDED ||
       game === Game.VRISING ||
+      game === Game.PALWORLD ||
+      game === Game.SATISFACTORY ||
       game === Game.CORE_KEEPER ||
       game === Game.RUST ||
       game === Game.BEAMMP
