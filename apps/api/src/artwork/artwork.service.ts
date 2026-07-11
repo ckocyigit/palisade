@@ -1,5 +1,5 @@
 import { Injectable, Logger } from "@nestjs/common";
-import { Game, GAME_LABELS, STEAM_APP_ID, type GameArtwork } from "@ark/shared";
+import { Game, GAME_LABELS, STORE_APP_ID, type GameArtwork } from "@ark/shared";
 import { ManagerSettingsService, SettingKeys } from "../manager-settings/manager-settings.service";
 
 const SGDB_BASE = "https://www.steamgriddb.com/api/v2";
@@ -8,16 +8,12 @@ const FETCH_TIMEOUT_MS = 10_000;
 const RETRY_EMPTY_AFTER_MS = 7 * 24 * 60 * 60_000;
 
 /**
- * Some images don't install via SteamCMD, so STEAM_APP_ID is 0 even though the
- * game itself is well-known — resolve those by name instead. Names are chosen
- * for SGDB search quality (our labels carry qualifiers like "(TShock)").
+ * Minecraft/Bedrock aren't on Steam (STORE_APP_ID 0), so resolve their art by
+ * name search. Every other game has a store app id and resolves directly.
  */
 const SEARCH_NAME: Partial<Record<Game, string>> = {
   [Game.MINECRAFT]: "Minecraft",
   [Game.BEDROCK]: "Minecraft",
-  [Game.TERRARIA]: "Terraria",
-  [Game.FACTORIO]: "Factorio",
-  [Game.BEAMMP]: "BeamNG.drive",
 };
 
 type CacheEntry = GameArtwork & { fetchedAt: string };
@@ -94,8 +90,9 @@ export class ArtworkService {
   }
 
   private async fetchGameArt(game: Game, key: string): Promise<GameArtwork> {
-    // Steam-installed games resolve directly by app id; the rest search by name.
-    const appId = STEAM_APP_ID[game];
+    // Resolve by the game's STORE app id (where SGDB indexes art), not the
+    // dedicated-server id; the two non-Steam games fall back to name search.
+    const appId = STORE_APP_ID[game];
     let ref: { kind: "steam" | "game"; id: number } | null =
       appId > 0 ? { kind: "steam", id: appId } : null;
     if (!ref) {

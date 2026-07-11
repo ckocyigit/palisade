@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { Game, STEAM_APP_ID } from "@ark/shared";
+import { Game, STORE_APP_ID } from "@ark/shared";
 import { ArtworkService } from "./artwork.service";
 
 // The service resolves art by Steam app id where we have one and by name search
@@ -37,20 +37,20 @@ describe("ArtworkService", () => {
     expect(calls).toHaveLength(0);
   });
 
-  it("resolves a Steam-installed game by app id (grids/steam/<appid>)", async () => {
+  it("resolves games by their STORE app id (not the dedicated-server id)", async () => {
     const { svc } = makeService({ steamgriddb_api_key: "k" });
     await svc.refresh();
-    const appId = STEAM_APP_ID[Game.PALWORLD];
-    expect(calls.some((u) => u.includes(`/grids/steam/${appId}`))).toBe(true);
-    // ASA too — proves it isn't a one-off.
-    expect(calls.some((u) => u.includes(`/grids/steam/${STEAM_APP_ID[Game.ASA]}`))).toBe(true);
+    // Palworld art lives on the game (1623730), not the server (2394010).
+    expect(STORE_APP_ID[Game.PALWORLD]).toBe(1623730);
+    expect(calls.some((u) => u.includes(`/grids/steam/${STORE_APP_ID[Game.PALWORLD]}`))).toBe(true);
+    // ASA game (2399830), not server (2430930) — the case that had zero art.
+    expect(calls.some((u) => u.includes(`/grids/steam/${STORE_APP_ID[Game.ASA]}`))).toBe(true);
   });
 
-  it("resolves a non-Steam game by name search first, then by SGDB game id", async () => {
+  it("resolves Minecraft (not on Steam) by name search, then by SGDB game id", async () => {
     const { svc } = makeService({ steamgriddb_api_key: "k" });
     await svc.refresh();
-    // Factorio (app id 0) must autocomplete, then hit /grids/game/999.
-    expect(calls.some((u) => u.includes("/search/autocomplete/Factorio"))).toBe(true);
+    expect(calls.some((u) => u.includes("/search/autocomplete/Minecraft"))).toBe(true);
     expect(calls.some((u) => u.includes("/grids/game/999"))).toBe(true);
   });
 

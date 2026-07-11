@@ -118,6 +118,38 @@ export const STEAM_APP_ID: Record<Game, number> = {
   [Game.BEAMMP]: 0,
 };
 
+/**
+ * The STORE (game) Steam app id, distinct from STEAM_APP_ID above which is the
+ * DEDICATED-SERVER app id used by SteamCMD. SteamGridDB indexes artwork under
+ * the game's store id, not the server id — e.g. ASA art lives on 2399830 (game),
+ * not 2430930 (server); Palworld on 1623730, not 2394010. 0 = not on Steam
+ * (Minecraft/Bedrock resolve art by name search instead).
+ */
+export const STORE_APP_ID: Record<Game, number> = {
+  [Game.ASA]: 2399830,
+  [Game.ASE]: 346110,
+  [Game.CONAN]: 440900,
+  [Game.PALWORLD]: 1623730,
+  [Game.MINECRAFT]: 0,
+  [Game.ICARUS]: 1149460,
+  [Game.BEDROCK]: 0,
+  [Game.VALHEIM]: 892970,
+  [Game.SEVEN_DAYS]: 251570,
+  [Game.ENSHROUDED]: 1203620,
+  [Game.ZOMBOID]: 108600,
+  [Game.VRISING]: 1604030,
+  [Game.SOTF]: 1326470,
+  [Game.SATISFACTORY]: 526870,
+  [Game.LIF]: 290080,
+  [Game.ATS]: 270880,
+  [Game.ETS2]: 227300,
+  [Game.CORE_KEEPER]: 1621690,
+  [Game.TERRARIA]: 105600,
+  [Game.FACTORIO]: 427520,
+  [Game.RUST]: 252490,
+  [Game.BEAMMP]: 284160,
+};
+
 /** Steam Workshop "consumer" app ids for mod downloads (ARK: Survival Evolved /
  *  Conan Exiles). ASA uses CurseForge instead, so it has no Workshop app id. */
 export const ASE_WORKSHOP_APP_ID = 346110;
