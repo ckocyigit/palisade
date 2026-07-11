@@ -57,8 +57,14 @@ export class ImageTagsService {
     const json = (await this.getJson(`https://ghcr.io/v2/${path}/tags/list`, {
       Authorization: `Bearer ${tokenRes.token}`,
     })) as { tags?: string[] } | null;
-    // The registry returns tags oldest→newest; reverse so recent ones show first.
-    return (json?.tags ?? []).slice().reverse().map((name) => ({ name, updatedAt: null }));
+    // GHCR lists cosign signature/attestation artifacts as tags (sha256-<digest>.sig /
+    // .att) alongside real ones — drop those. The registry returns tags oldest→newest;
+    // reverse so recent ones show first.
+    return (json?.tags ?? [])
+      .filter((name) => !/^sha256-/.test(name))
+      .slice()
+      .reverse()
+      .map((name) => ({ name, updatedAt: null }));
   }
 
   private async getJson(url: string, headers?: Record<string, string>): Promise<unknown> {
