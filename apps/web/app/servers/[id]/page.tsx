@@ -29,6 +29,7 @@ import { BedrockModsTab } from "@/components/bedrock-mods-tab";
 import { SevenDaysModsTab } from "@/components/sevendays-mods-tab";
 import { ValheimModsTab } from "@/components/valheim-mods-tab";
 import { useStartGuard } from "@/components/start-guard";
+import { useArtwork } from "@/lib/use-artwork";
 import { BackupsTab } from "@/components/backups-tab";
 import { PlayersTab } from "@/components/players-tab";
 
@@ -39,6 +40,7 @@ export default function ServerDetailPage({ params }: { params: Promise<{ id: str
   const { id } = use(params);
   const router = useRouter();
   const [server, setServer] = useState<ServerSummary | null>(null);
+  const artwork = useArtwork();
   const [config, setConfig] = useState<ServerConfigValues | null>(null);
   const [configKey, setConfigKey] = useState(0); // bump to remount the editor on copy-in
   const [tab, setTab] = useState<Tab>("Overview");
@@ -143,6 +145,8 @@ export default function ServerDetailPage({ params }: { params: Promise<{ id: str
 
   if (!server) return <div className="text-slate-400">Loading…</div>;
 
+  const art = artwork[server.game];
+
   // Button availability follows the server state machine; `pending` covers the
   // click→response gap so a button can't be re-clicked before its state lands.
   const st = server.state;
@@ -180,6 +184,24 @@ export default function ServerDetailPage({ params }: { params: Promise<{ id: str
       <Link href="/" className="inline-flex items-center gap-1 text-sm text-slate-400 hover:text-slate-200">
         <ArrowLeft className="h-4 w-4" /> All servers
       </Link>
+
+      {art?.hero && (
+        <div className="relative -mt-1 overflow-hidden rounded-xl ring-1 ring-black/40">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={art.hero} alt="" className="h-40 w-full object-cover sm:h-48" loading="lazy" />
+          {/* Fade the bottom into the page so the banner reads as a header, not a photo. */}
+          <div className="absolute inset-0 bg-gradient-to-t from-ark-bg via-ark-bg/30 to-transparent" />
+          {art.logo && (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img
+              src={art.logo}
+              alt=""
+              className="absolute bottom-3 left-4 max-h-16 max-w-[55%] object-contain drop-shadow-lg"
+              loading="lazy"
+            />
+          )}
+        </div>
+      )}
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">

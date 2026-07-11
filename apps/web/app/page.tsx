@@ -48,6 +48,7 @@ import { UpdateBadge } from "@/components/update-badge";
 import { ConnectCommand } from "@/components/connect-command";
 import { UnofficialListHelp } from "@/components/unofficial-list-help";
 import { useStartGuard } from "@/components/start-guard";
+import { useArtwork } from "@/lib/use-artwork";
 
 interface ClusterLite {
   id: string;
@@ -69,6 +70,7 @@ export default function DashboardPage() {
   }, []);
 
   const { start: guardedStart, dialog: startDialog } = useStartGuard(refresh);
+  const artwork = useArtwork();
   const clusterName = (id?: string | null) => clusters.find((c) => c.id === id)?.name;
 
   useEffect(() => refresh(), [refresh]);
@@ -172,14 +174,26 @@ export default function DashboardPage() {
         {servers.map((s) => (
           <div key={s.id} className="card space-y-3">
             <div className="flex items-start justify-between">
-              <div>
-                <Link href={`/servers/${s.id}`} className="text-lg font-medium hover:underline">
-                  {s.name}
-                </Link>
-                <div className="text-sm text-slate-400">
-                  {s.game} · {mapLabel(s.map)} · :{s.ports.game}
-                </div>
-                <MiniStats s={stats[s.id]} />
+              <div className="flex min-w-0 items-start gap-3">
+                {artwork[s.game]?.grid && (
+                  <Link href={`/servers/${s.id}`} className="shrink-0">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={artwork[s.game]!.grid!}
+                      alt=""
+                      className="h-20 w-[3.33rem] rounded-md object-cover shadow-md ring-1 ring-black/40"
+                      loading="lazy"
+                    />
+                  </Link>
+                )}
+                <div className="min-w-0">
+                  <Link href={`/servers/${s.id}`} className="text-lg font-medium hover:underline">
+                    {s.name}
+                  </Link>
+                  <div className="text-sm text-slate-400">
+                    {s.game} · {mapLabel(s.map)} · :{s.ports.game}
+                  </div>
+                  <MiniStats s={stats[s.id]} />
                 {s.clusterId && (
                   <Link
                     href="/clusters"
@@ -189,6 +203,7 @@ export default function DashboardPage() {
                     <Boxes className="h-3 w-3" /> {clusterName(s.clusterId) ?? "Cluster"}
                   </Link>
                 )}
+                </div>
               </div>
               <div className="flex flex-col items-end gap-1.5">
                 <StateBadge state={s.state} />

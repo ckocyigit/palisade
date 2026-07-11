@@ -183,3 +183,15 @@ export interface RealtimeMessage<T = unknown> {
 export type Role = "viewer" | "operator" | "admin";
 export const ROLE_RANK: Record<Role, number> = { viewer: 0, operator: 1, admin: 2 };
 export const ROLES: Role[] = ["viewer", "operator", "admin"];
+
+/** Per-game artwork resolved from SteamGridDB (all URLs on their CDN; null = none found). */
+export interface GameArtwork {
+  /** 600x900 portrait cover ("grid"). */
+  grid: string | null;
+  /** Wide banner ("hero", e.g. 1920x620). */
+  hero: string | null;
+  /** Transparent title logo. */
+  logo: string | null;
+  /** Square icon. */
+  icon: string | null;
+}
