@@ -10,7 +10,23 @@ container spawns and supervises a container per game server, manages every
 setting through schema-driven forms, and handles mods, backups, schedules,
 player administration, and even your router's port-forwards.
 
-**Supported games (22):**
+## Quick start (Unraid)
+
+1. **Apps tab → search "Palisade" → Install.** The defaults are ready to go — the
+   only field to check is **App data**: point it at a folder on a real disk
+   (`/mnt/cache/appdata/palisade`), *not* the `/mnt/user` FUSE share, so the game-file
+   cache can reflink-clone between servers.
+2. **Leave the secrets and `HOST_DATA_DIR` blank.** The manager generates and persists
+   its own keys on first start and auto-detects the host data path — there's nothing to
+   generate in a terminal.
+3. **Open the WebUI**, create your admin account on the first-run screen, and add a game
+   server. That's it.
+
+> Not on Unraid? It's a single container — run the same image (`ghcr.io/shakes63/palisade`)
+> with `/var/run/docker.sock` and a data volume mounted; see the template in
+> [`unraid/palisade.xml`](unraid/palisade.xml) for the full env/mount list.
+
+**Supported games (23):**
 
 | Game | Runtime | Console | Mods |
 |---|---|---|---|

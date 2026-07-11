@@ -5,12 +5,20 @@ import { ValidationPipe, Logger } from "@nestjs/common";
 import helmet from "helmet";
 import { AppModule } from "./app.module";
 import { loadEnv } from "./config/env";
+import { ensureSecrets } from "./config/ensure-secrets";
+import { ensureHostDataDir } from "./config/ensure-host-data-dir";
 import { installProcessSafetyNet } from "./common/process-safety";
 
 async function bootstrap() {
   // Guard against a single background error (a socket reset, a stray rejection)
   // taking the whole manager down — must be active before anything else runs.
   installProcessSafetyNet();
+  // Auto-generate + persist SECRETS_KEY/JWT_SECRET if the user didn't supply them,
+  // so a blank install boots instead of failing loadEnv's required-secret check.
+  ensureSecrets();
+  // Auto-detect HOST_DATA_DIR from our own /data mount if unset (best-effort). Both
+  // run BEFORE loadEnv, which caches the environment.
+  await ensureHostDataDir();
   const env = loadEnv();
   const app = await NestFactory.create(AppModule, { bufferLogs: false });
 
