@@ -116,6 +116,7 @@ function gameSpecFor(input: RuntimeSpecInput): Docker.ContainerCreateOptions {
   if (input.game === Game.ASA) return buildPokSpec(input);
   if (input.game === Game.CONAN) return buildConanSpec(input);
   if (input.game === Game.PALWORLD) return buildPalworldSpec(input);
+  if (input.game === Game.PALWORLD_WINE) return buildPalworldWineSpec(input);
   if (input.game === Game.MINECRAFT) return buildMinecraftSpec(input);
   if (input.game === Game.ICARUS) return buildIcarusSpec(input);
   if (input.game === Game.BEDROCK) return buildBedrockSpec(input);
@@ -526,16 +527,87 @@ function buildPalworldSpec(input: RuntimeSpecInput): Docker.ContainerCreateOptio
 }
 
 /** Palworld settings -> env vars. Booleans become PalWorldSettings.ini's True/False. */
-function palworldCatalogEnv(input: RuntimeSpecInput): string[] {
+function palworldCatalogEnv(input: RuntimeSpecInput, boolStyle: "True" | "true" = "True"): string[] {
   const out: string[] = [];
   for (const def of input.catalog.settings) {
     if (def.target !== SettingTarget.Env) continue;
     const raw = input.config.values?.[def.key] ?? def.default;
     if (raw === undefined || raw === null) continue;
-    const val = typeof raw === "boolean" ? (raw ? "True" : "False") : String(raw);
+    const t = boolStyle === "True" ? ["True", "False"] : ["true", "false"];
+    const val = typeof raw === "boolean" ? (raw ? t[0] : t[1]) : String(raw);
     out.push(`${def.emitAs ?? def.key}=${val}`);
   }
   return out;
+}
+
+/**
+ * Palworld under Wine (ripps818/docker-palworld-dedicated-server-wine): runs the
+ * WINDOWS PalServer.exe via Wine+Xvfb, which is what unlocks DLL mods (PalGuard,
+ * PalDefender) that the native Linux binary can't load. Its env contract differs
+ * from thijsvanloef's native image (PUBLIC_PORT vs PORT, MAX_PLAYERS vs PLAYERS,
+ * MULTITHREAD_ENABLED vs MULTITHREADING, WindowsServer config dir, lowercase
+ * bools), so it's a separate builder. The image renders PalWorldSettings.ini
+ * from env; UE4SS installs the Windows way into Pal/Binaries/Win64 (no launcher
+ * patch), so config-writer treats it as env-only. Uses gosu (not sudo) → the
+ * no-new-privileges hardening is safe here.
+ */
+function buildPalworldWineSpec(input: RuntimeSpecInput): Docker.ContainerCreateOptions {
+  const env = loadEnv();
+  const { ports } = input;
+  const name = containerName(input.serverId, input.game, input.sessionName);
+  const hostNet = env.GAME_HOST_NETWORK;
+
+  const palEnv = [
+    `TZ=${input.timezone || env.TZ}`,
+    `PUID=${env.PUID}`,
+    `PGID=${env.PGID}`,
+    `SERVER_NAME=${input.sessionName}`,
+    `SERVER_PASSWORD=${serverPassword(input)}`,
+    `ADMIN_PASSWORD=${input.adminPassword}`,
+    `RCON_ENABLED=true`,
+    `RCON_PORT=${ports.rcon}`,
+    `PUBLIC_PORT=${ports.game}`,
+    `MAX_PLAYERS=${input.maxPlayers}`,
+    `MULTITHREAD_ENABLED=true`,
+    // The manager owns updates/backups/restarts — silence the image's own loops.
+    `ALWAYS_UPDATE_ON_START=false`,
+    `BACKUP_ENABLED=false`,
+    `RESTART_ENABLED=false`,
+    ...palworldCatalogEnv(input, "true"),
+  ];
+
+  const binds = [`${HostPaths.instanceRoot(input.serverId)}:${PALWORLD_DATA_DIR}`];
+
+  return {
+    name,
+    Image: IMAGES[Game.PALWORLD_WINE],
+    Hostname: name,
+    Env: palEnv,
+    Labels: serverLabels(input, env.PUBLIC_BASE_URL),
+    ...(hostNet
+      ? {}
+      : {
+          ExposedPorts: {
+            [portKey(ports.game, "udp")]: {},
+            [portKey(ports.rcon, "tcp")]: {},
+          },
+        }),
+    HostConfig: {
+      Binds: binds,
+      ...(hostNet
+        ? { NetworkMode: "host" }
+        : {
+            PortBindings: {
+              [portKey(ports.game, "udp")]: [{ HostPort: String(ports.game) }],
+              [portKey(ports.rcon, "tcp")]: [{ HostPort: String(ports.rcon) }],
+            },
+          }),
+      RestartPolicy: { Name: "no" },
+      Memory: input.ramLimitMb ? input.ramLimitMb * 1024 * 1024 : undefined,
+      NanoCpus: input.cpuLimit ? Math.round(input.cpuLimit * 1e9) : undefined,
+    },
+    ...(hostNet ? {} : { NetworkingConfig: { EndpointsConfig: { [ARK_NETWORK]: {} } } }),
+  };
 }
 
 /**

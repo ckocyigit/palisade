@@ -52,6 +52,10 @@ describe("readiness markers (per-game)", () => {
     expect(readyReFor(Game.PALWORLD).test("Running Palworld dedicated server on :7777")).toBe(true);
   });
 
+  it("shares the Palworld marker for the Wine variant", () => {
+    expect(readyReFor(Game.PALWORLD_WINE).test("Running Palworld dedicated server on :8311")).toBe(true);
+  });
+
   it("matches the Minecraft 'Done (Ns)! For help' line", () => {
     expect(readyReFor(Game.MINECRAFT).test('[Server thread/INFO]: Done (8.488s)! For help, type "help"')).toBe(
       true,

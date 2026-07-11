@@ -103,6 +103,7 @@ export const READY_RE_BY_GAME: Record<Game, RegExp> = {
   [Game.ASE]: /(advertising for join(?!')|server is up)/i,
   [Game.CONAN]: /Startup report\. StartupTime=/i,
   [Game.PALWORLD]: /Running Palworld dedicated server/i,
+  [Game.PALWORLD_WINE]: /Running Palworld dedicated server/i,
   [Game.MINECRAFT]: /Done \([\d.]+s\)! For help/i,
   [Game.ICARUS]: /Match State Changed from EnteringMap to WaitingToStart|SteamNetDriver_\w+ bound to port/i,
   // Bedrock's dedicated server prints "Server started." once it's up (no RCON to

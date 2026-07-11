@@ -75,7 +75,8 @@ export class ServerConfigWriter {
       game === Game.SATISFACTORY ||
       game === Game.CORE_KEEPER ||
       game === Game.RUST ||
-      game === Game.BEAMMP
+      game === Game.BEAMMP ||
+      game === Game.PALWORLD_WINE
     )
       return;
 

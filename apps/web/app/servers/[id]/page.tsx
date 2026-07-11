@@ -338,7 +338,7 @@ export default function ServerDetailPage({ params }: { params: Promise<{ id: str
           <div className="text-slate-400">Loading settings…</div>
         ))}
       {tab === "Mods" &&
-        (server.game === Game.PALWORLD ? (
+        (server.game === Game.PALWORLD || server.game === Game.PALWORLD_WINE ? (
           <PalworldModsTab serverId={id} />
         ) : server.game === Game.MINECRAFT ? (
           <MinecraftModsTab serverId={id} />

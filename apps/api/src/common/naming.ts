@@ -10,6 +10,7 @@ const CONTAINER_PREFIX: Record<Game, string> = {
   [Game.ASE]: "ark",
   [Game.CONAN]: "conan",
   [Game.PALWORLD]: "palworld",
+  [Game.PALWORLD_WINE]: "palworld-wine",
   [Game.MINECRAFT]: "minecraft",
   [Game.ICARUS]: "icarus",
   [Game.BEDROCK]: "bedrock",

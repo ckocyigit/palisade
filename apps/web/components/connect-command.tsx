@@ -161,7 +161,7 @@ export function ConnectCommand({
     );
   }
 
-  if (game === Game.PALWORLD) {
+  if (game === Game.PALWORLD || game === Game.PALWORLD_WINE) {
     return (
       <div className={className}>
         <div className="mb-1 flex items-center gap-1.5 text-xs font-medium text-slate-400">

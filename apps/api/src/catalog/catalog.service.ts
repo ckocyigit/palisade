@@ -4,6 +4,7 @@ import { ASA_CATALOG } from "./asa.catalog";
 import { ASE_CATALOG } from "./ase.catalog";
 import { CONAN_CATALOG } from "./conan.catalog";
 import { PALWORLD_CATALOG } from "./palworld.catalog";
+import { PALWORLD_WINE_CATALOG } from "./palworld-wine.catalog";
 import { MINECRAFT_CATALOG } from "./minecraft.catalog";
 import { ICARUS_CATALOG } from "./icarus.catalog";
 import { BEDROCK_CATALOG } from "./bedrock.catalog";
@@ -30,6 +31,7 @@ export class CatalogService {
     if (game === Game.ASE) return ASE_CATALOG;
     if (game === Game.CONAN) return CONAN_CATALOG;
     if (game === Game.PALWORLD) return PALWORLD_CATALOG;
+    if (game === Game.PALWORLD_WINE) return PALWORLD_WINE_CATALOG;
     if (game === Game.MINECRAFT) return MINECRAFT_CATALOG;
     if (game === Game.ICARUS) return ICARUS_CATALOG;
     if (game === Game.BEDROCK) return BEDROCK_CATALOG;

@@ -216,7 +216,7 @@ export function SettingsForm({
   const GROUPS =
     game === Game.CONAN
       ? CONAN_GROUPS
-      : game === Game.PALWORLD
+      : game === Game.PALWORLD || game === Game.PALWORLD_WINE
         ? PALWORLD_GROUPS
         : game === Game.MINECRAFT
           ? MINECRAFT_GROUPS

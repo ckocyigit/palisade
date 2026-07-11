@@ -17,6 +17,7 @@ export const IMAGES: Record<Game, string> = {
   // thijsvanloef/palworld-server-docker — env-driven; installs app 2394010 via
   // SteamCMD on boot, compiles PalWorldSettings.ini from env, has RCON.
   [Game.PALWORLD]: "thijsvanloef/palworld-server-docker:latest",
+  [Game.PALWORLD_WINE]: "ghcr.io/ripps818/docker-palworld-dedicated-server-wine:latest",
   // itzg/minecraft-server — the canonical Minecraft image. Downloads the server
   // jar (vanilla/Paper/Forge/Fabric) itself on first boot into /data, writes
   // server.properties from env vars, and has built-in RCON.
@@ -194,6 +195,7 @@ export const SERVER_UID: Record<Game, number> = {
   [Game.ASE]: 1000, // hermsi's "steam" user
   [Game.CONAN]: 1000, // Conan image's "pokuser"
   [Game.PALWORLD]: 1000, // palworld image's "steam" user
+  [Game.PALWORLD_WINE]: 1000, // ripps818 wine image runs as steam:steam too
   [Game.MINECRAFT]: 1000, // itzg's default UID (overridable via UID/GID env)
   [Game.ICARUS]: 4711, // mornedhels default (overridable via PUID/PGID); unused — env-driven, no INI injection
   [Game.BEDROCK]: 1000, // itzg derives UID/GID from /data owner; we pass PUID/PGID. Unused here.
@@ -218,6 +220,7 @@ export const SERVER_GID: Record<Game, number> = {
   [Game.ASE]: 1000,
   [Game.CONAN]: 1000,
   [Game.PALWORLD]: 1000,
+  [Game.PALWORLD_WINE]: 1000,
   [Game.MINECRAFT]: 1000,
   [Game.ICARUS]: 4711,
   [Game.BEDROCK]: 1000,

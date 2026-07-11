@@ -8,6 +8,7 @@ export enum Game {
   CONAN = "CONAN",
   /** Palworld — native Linux, env-driven; RCON (no Workshop mods). */
   PALWORLD = "PALWORLD",
+  PALWORLD_WINE = "PALWORLD_WINE",
   /** Minecraft (Java) — itzg image, downloads the server jar itself; TCP, RCON. */
   MINECRAFT = "MINECRAFT",
   /** Icarus — mornedhels image (SteamCMD under Wine), env-driven; NO network RCON. */
@@ -52,6 +53,7 @@ export const GAME_LABELS: Record<Game, string> = {
   [Game.ASE]: "ARK: Survival Evolved",
   [Game.CONAN]: "Conan Exiles",
   [Game.PALWORLD]: "Palworld",
+  [Game.PALWORLD_WINE]: "Palworld (Wine — full mods)",
   [Game.MINECRAFT]: "Minecraft (Java)",
   [Game.ICARUS]: "Icarus",
   [Game.BEDROCK]: "Minecraft (Bedrock)",
@@ -78,6 +80,7 @@ export const STEAM_APP_ID: Record<Game, number> = {
   [Game.ASE]: 376030,
   [Game.CONAN]: 443030,
   [Game.PALWORLD]: 2394010,
+  [Game.PALWORLD_WINE]: 2394010,
   // Minecraft isn't on Steam — the itzg image downloads the server jar from
   // Mojang/its build sources. This is only read by the ASA-only game-file cache,
   // so the value is unused for Minecraft.
@@ -130,6 +133,7 @@ export const STORE_APP_ID: Record<Game, number> = {
   [Game.ASE]: 346110,
   [Game.CONAN]: 440900,
   [Game.PALWORLD]: 1623730,
+  [Game.PALWORLD_WINE]: 1623730,
   [Game.MINECRAFT]: 0,
   [Game.ICARUS]: 1149460,
   [Game.BEDROCK]: 0,
@@ -174,6 +178,7 @@ export const GAME_ICONS: Record<Game, string> = {
   [Game.ASE]: "https://cdn.cloudflare.steamstatic.com/steam/apps/346110/header.jpg",
   [Game.CONAN]: "https://cdn.cloudflare.steamstatic.com/steam/apps/440900/header.jpg",
   [Game.PALWORLD]: "https://cdn.cloudflare.steamstatic.com/steam/apps/1623730/header.jpg",
+  [Game.PALWORLD_WINE]: "https://cdn.cloudflare.steamstatic.com/steam/apps/1623730/header.jpg",
   // Minecraft has no Steam page; use the Wikimedia logo thumbnail (cosmetic — a
   // 404 just falls back to Unraid's default container icon).
   [Game.MINECRAFT]:
@@ -227,6 +232,7 @@ export const RAM_ESTIMATE_MB: Record<Game, number> = {
   [Game.ASE]: 7000,
   [Game.CONAN]: 7000,
   [Game.PALWORLD]: 8000,
+  [Game.PALWORLD_WINE]: 10000,
   // Vanilla Java is light (~2-3 GB); modpacks run heavier. 4 GB is a safe headroom
   // estimate for the start guard — a server's own ramLimitMb overrides it.
   [Game.MINECRAFT]: 4000,
@@ -277,6 +283,7 @@ export const MAX_PLAYERS_BY_GAME: Record<Game, number> = {
   [Game.ASE]: 127,
   [Game.CONAN]: 40, // Conan Exiles server hard cap
   [Game.PALWORLD]: 32, // Palworld dedicated hard cap
+  [Game.PALWORLD_WINE]: 32,
   [Game.MINECRAFT]: 100, // no hard cap; a sane ceiling
   [Game.ICARUS]: 20, // was 8, RocketWerkz raised the ceiling to 20 slots
   [Game.BEDROCK]: 30,
@@ -304,6 +311,7 @@ export const DEFAULT_MAX_PLAYERS_BY_GAME: Record<Game, number> = {
   [Game.ASE]: 70,
   [Game.CONAN]: 40,
   [Game.PALWORLD]: 16,
+  [Game.PALWORLD_WINE]: 16,
   [Game.MINECRAFT]: 20,
   [Game.ICARUS]: 8,
   [Game.BEDROCK]: 10,
@@ -346,6 +354,7 @@ export const ADMIN_PASSWORD_META: Record<Game, PasswordFieldMeta> = {
   [Game.ASE]: { show: true, label: "Admin password (enables RCON)" },
   [Game.CONAN]: { show: true, label: "Admin password (enables RCON)" },
   [Game.PALWORLD]: { show: true, label: "Admin password (enables RCON)" },
+  [Game.PALWORLD_WINE]: { show: true, label: "Admin password (enables RCON)" },
   [Game.MINECRAFT]: { show: true, label: "RCON password (enables the console)" },
   [Game.ICARUS]: { show: true, label: "Admin password (in-game /AdminLogin)" },
   [Game.BEDROCK]: { show: false, label: "" },
@@ -401,6 +410,7 @@ export const JOIN_PASSWORD_META: Record<Game, PasswordFieldMeta> = {
   [Game.ASE]: { show: true, label: "Server password (players need it to join)" },
   [Game.CONAN]: { show: true, label: "Server password (players need it to join)" },
   [Game.PALWORLD]: { show: true, label: "Server password (players need it to join)" },
+  [Game.PALWORLD_WINE]: { show: true, label: "Server password (players need it to join)" },
   [Game.MINECRAFT]: { show: true, label: "Server password (players need it to join)" },
   [Game.ICARUS]: { show: true, label: "Server password (players need it to join)" },
   [Game.BEDROCK]: { show: true, label: "Server password (players need it to join)" },
@@ -705,6 +715,7 @@ export const MAPS_BY_GAME: Record<Game, readonly string[]> = {
   [Game.ASE]: ASE_OFFICIAL_MAPS,
   [Game.CONAN]: CONAN_OFFICIAL_MAPS,
   [Game.PALWORLD]: PALWORLD_OFFICIAL_MAPS,
+  [Game.PALWORLD_WINE]: PALWORLD_OFFICIAL_MAPS,
   [Game.MINECRAFT]: MINECRAFT_OFFICIAL_MAPS,
   [Game.ICARUS]: ICARUS_OFFICIAL_MAPS,
   [Game.BEDROCK]: BEDROCK_OFFICIAL_MAPS,

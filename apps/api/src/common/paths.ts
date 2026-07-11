@@ -51,6 +51,7 @@ export const LocalPaths = {
       case Game.CONAN:
         return ["server/ConanSandbox/Saved"];
       case Game.PALWORLD:
+      case Game.PALWORLD_WINE:
         return ["Pal/Saved"];
       case Game.MINECRAFT:
         return ["world", "world_nether", "world_the_end"];
