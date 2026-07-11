@@ -244,7 +244,10 @@ describe("server lifecycle (fake Docker)", () => {
         HostConfig: { SecurityOpt: string[]; PidsLimit: number };
       };
       expect(spec.Image, game).toBeTruthy();
-      expect(spec.HostConfig.SecurityOpt, game).toContain("no-new-privileges:true");
+      // ASA + Conan (POK images) sudo in their entrypoints → no-new-privileges
+      // would crash them, so they're exempt; every other game gets it.
+      const nnp = (spec.HostConfig.SecurityOpt ?? []).includes("no-new-privileges:true");
+      expect(nnp, game).toBe(!(game === Game.ASA || game === Game.CONAN));
       expect(spec.HostConfig.PidsLimit, game).toBe(8192);
       expect(d.started, game).toEqual(["container-1"]);
       expect(row.state, game).toBe(ServerState.Starting); // no marker scripted

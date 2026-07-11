@@ -82,8 +82,18 @@ export interface RuntimeSpecInput {
 
 /** Build the Docker create spec for a game-server container. */
 export function buildContainerSpec(input: RuntimeSpecInput): Docker.ContainerCreateOptions {
-  return hardenSpec(gameSpecFor(input));
+  return hardenSpec(gameSpecFor(input), input.game);
 }
+
+/**
+ * The POK images (ASA + Conan, both Acekorneya) run `sudo` in their entrypoints,
+ * and sudo refuses to run under no-new-privileges EVEN AS ROOT (it checks the
+ * flag explicitly) — the container dies before printing a line. gosu/su-based
+ * images are unaffected (dropping FROM root needs no escalation), so only these
+ * two are exempt. Found live: Conan crash-looped with
+ * "sudo: The 'no new privileges' flag is set". They still get the PidsLimit.
+ */
+const NO_NEW_PRIVS_EXEMPT = new Set<Game>([Game.ASA, Game.CONAN]);
 
 /**
  * Defense-in-depth applied to every game container: no-new-privileges blocks
@@ -93,9 +103,11 @@ export function buildContainerSpec(input: RuntimeSpecInput): Docker.ContainerCre
  * 8192 is far above real usage, but UE5-under-Proton servers run 1-2k threads
  * and threads count against the limit — hence not lower.
  */
-function hardenSpec(spec: Docker.ContainerCreateOptions): Docker.ContainerCreateOptions {
+function hardenSpec(spec: Docker.ContainerCreateOptions, game: Game): Docker.ContainerCreateOptions {
   const host = (spec.HostConfig ??= {});
-  host.SecurityOpt = [...(host.SecurityOpt ?? []), "no-new-privileges:true"];
+  if (!NO_NEW_PRIVS_EXEMPT.has(game)) {
+    host.SecurityOpt = [...(host.SecurityOpt ?? []), "no-new-privileges:true"];
+  }
   host.PidsLimit ??= 8192;
   return spec;
 }
