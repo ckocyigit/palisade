@@ -561,6 +561,11 @@ function buildPalworldWineSpec(input: RuntimeSpecInput): Docker.ContainerCreateO
     `TZ=${input.timezone || env.TZ}`,
     `PUID=${env.PUID}`,
     `PGID=${env.PGID}`,
+    // Without this the image defaults to SERVER_SETTINGS_MODE=manual and IGNORES every
+    // env var above (ports, RCON, passwords, catalog) — the server then boots on its
+    // hard-coded defaults (game 8211, RCON off). "auto" makes it envsubst our values
+    // into PalWorldSettings.ini on each start.
+    `SERVER_SETTINGS_MODE=auto`,
     `SERVER_NAME=${input.sessionName}`,
     `SERVER_PASSWORD=${serverPassword(input)}`,
     `ADMIN_PASSWORD=${input.adminPassword}`,

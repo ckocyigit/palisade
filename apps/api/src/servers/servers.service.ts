@@ -103,7 +103,12 @@ export const READY_RE_BY_GAME: Record<Game, RegExp> = {
   [Game.ASE]: /(advertising for join(?!')|server is up)/i,
   [Game.CONAN]: /Startup report\. StartupTime=/i,
   [Game.PALWORLD]: /Running Palworld dedicated server/i,
-  [Game.PALWORLD_WINE]: /Running Palworld dedicated server/i,
+  // The ripps818 wine image emits NO positive readiness line (it detects the server via
+  // its REST/RCON poll, not a log line). Its server-manager prints ">>> Starting the
+  // gameserver" right before launching PalServer.exe — the only deterministic marker.
+  // The RCON/player polls retry until the server (a couple minutes later under Wine)
+  // actually binds, so a slightly-early flip to Running is fine.
+  [Game.PALWORLD_WINE]: /Starting the gameserver/i,
   [Game.MINECRAFT]: /Done \([\d.]+s\)! For help/i,
   [Game.ICARUS]: /Match State Changed from EnteringMap to WaitingToStart|SteamNetDriver_\w+ bound to port/i,
   // Bedrock's dedicated server prints "Server started." once it's up (no RCON to

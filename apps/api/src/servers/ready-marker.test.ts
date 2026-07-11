@@ -52,8 +52,12 @@ describe("readiness markers (per-game)", () => {
     expect(readyReFor(Game.PALWORLD).test("Running Palworld dedicated server on :7777")).toBe(true);
   });
 
-  it("shares the Palworld marker for the Wine variant", () => {
-    expect(readyReFor(Game.PALWORLD_WINE).test("Running Palworld dedicated server on :8311")).toBe(true);
+  it("flips the Wine variant on the ripps818 image's 'Starting the gameserver' line", () => {
+    const wine = readyReFor(Game.PALWORLD_WINE);
+    expect(wine.test(">>> Starting the gameserver")).toBe(true);
+    // Must NOT flip on the earlier "Preparing to start" / "server manager" lines.
+    expect(wine.test(">>> Preparing to start the gameserver")).toBe(false);
+    expect(wine.test(">>> Starting server manager")).toBe(false);
   });
 
   it("matches the Minecraft 'Done (Ns)! For help' line", () => {
