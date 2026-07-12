@@ -66,6 +66,120 @@ async function buildEnshrouded(config: ServerConfigValues) {
   });
 }
 
+async function buildEnvGame(game: Game, catalogName: string, config: ServerConfigValues) {
+  const { buildContainerSpec } = await import("./runtime-spec");
+  const catalogs = await import("../catalog/" + catalogName);
+  const catalog = (catalogs as Record<string, unknown>)[
+    Object.keys(catalogs).find((k) => k.endsWith("_CATALOG")) as string
+  ];
+  return buildContainerSpec({
+    serverId: "srv1",
+    game,
+    map: "m",
+    sessionName: "S",
+    ports: { game: 100, rawSocket: 101, query: 102, rcon: 103 },
+    maxPlayers: 8,
+    adminPassword: "secret",
+    serverPassword: "hunter2",
+    modIds: [],
+    cluster: null,
+    config,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    catalog: catalog as any,
+  });
+}
+
+describe("ich777GameId", () => {
+  it("uses the bare appid for public, appends -beta for a branch", async () => {
+    const { ich777GameId } = await import("./runtime-spec");
+    expect(ich777GameId(2239530, undefined)).toBe("2239530");
+    expect(ich777GameId(2239530, "public")).toBe("2239530");
+    expect(ich777GameId(2239530, "temporary_1_53")).toBe("2239530 -beta temporary_1_53");
+    expect(ich777GameId(320850, "dx9-legacy")).toBe("320850 -beta dx9-legacy");
+    expect(ich777GameId(2239530, "bad branch!")).toBe("2239530"); // junk → default public
+  });
+});
+
+describe("new Steam-game version toggles", () => {
+  it("Valheim PUBLIC_TEST: default false, honours true", async () => {
+    expect(envOf(await buildEnvGame(Game.VALHEIM, "valheim.catalog", { values: {} }))).toContain("PUBLIC_TEST=false");
+    expect(
+      envOf(await buildEnvGame(Game.VALHEIM, "valheim.catalog", { values: { PUBLIC_TEST: "true" } })),
+    ).toContain("PUBLIC_TEST=true");
+  });
+
+  it("Palworld INSTALL_BETA_INSIDER: default false, honours true", async () => {
+    expect(
+      envOf(await buildEnvGame(Game.PALWORLD, "palworld.catalog", { values: {} })),
+    ).toContain("INSTALL_BETA_INSIDER=false");
+    expect(
+      envOf(await buildEnvGame(Game.PALWORLD, "palworld.catalog", { values: { INSTALL_BETA_INSIDER: "true" } })),
+    ).toContain("INSTALL_BETA_INSIDER=true");
+  });
+
+  it("V Rising BRANCH: current (empty) emits nothing, legacy pins the branch", async () => {
+    const cur = envOf(await buildEnvGame(Game.VRISING, "vrising.catalog", { values: {} }));
+    expect(cur.some((e) => e.startsWith("BRANCH="))).toBe(false);
+    expect(
+      envOf(await buildEnvGame(Game.VRISING, "vrising.catalog", { values: { BRANCH: "legacy-1.0.x-pc" } })),
+    ).toContain("BRANCH=legacy-1.0.x-pc");
+  });
+
+  it("ATS/ETS2 STEAM_BRANCH → GAME_ID -beta, never a server_config.sii key", async () => {
+    expect(envOf(await buildEnvGame(Game.ATS, "ats.catalog", { values: {} }))).toContain("GAME_ID=2239530");
+    expect(
+      envOf(await buildEnvGame(Game.ETS2, "ats.catalog", { values: { STEAM_BRANCH: "temporary_1_53" } })),
+    ).toContain("GAME_ID=1948160 -beta temporary_1_53");
+
+    const { patchAtsServerConfig } = await import("./runtime-spec");
+    const { ATS_CATALOG } = await import("../catalog/ats.catalog");
+    const sii = patchAtsServerConfig(`SiiNunit {\n server_config : .config {\n lobby_name: ""\n }\n}`, {
+      sessionName: "S",
+      serverPassword: "",
+      maxPlayers: 8,
+      gamePort: 100,
+      queryPort: 102,
+      catalog: ATS_CATALOG,
+      config: { values: { STEAM_BRANCH: "temporary_1_53" } },
+    });
+    expect(sii).not.toMatch(/STEAM_BRANCH/);
+  });
+
+  it("LiF STEAM_BRANCH → GAME_ID -beta, never a world_1.xml tag", async () => {
+    expect(envOf(await buildEnvGame(Game.LIF, "lif.catalog", { values: {} }))).toContain("GAME_ID=320850");
+    expect(
+      envOf(await buildEnvGame(Game.LIF, "lif.catalog", { values: { STEAM_BRANCH: "dx9-legacy" } })),
+    ).toContain("GAME_ID=320850 -beta dx9-legacy");
+
+    const { patchLifWorldXml } = await import("./runtime-spec");
+    const { LIF_CATALOG } = await import("../catalog/lif.catalog");
+    const xml = patchLifWorldXml(`<world><name>x</name><password></password></world>`, {
+      sessionName: "S",
+      serverPassword: "",
+      adminPassword: "",
+      maxPlayers: 8,
+      gamePort: 100,
+      catalog: LIF_CATALOG,
+      config: { values: { STEAM_BRANCH: "dx9-legacy" } },
+    });
+    expect(xml).not.toMatch(/STEAM_BRANCH/);
+  });
+});
+
+describe("GAME_VERSION_PINNING classification", () => {
+  it("classifies every game and matches the wired-up controls", async () => {
+    const { GAME_VERSION_PINNING } = await import("@ark/shared");
+    // Every enum member is present (Record<Game,…> already forces this at compile time).
+    expect(Object.keys(GAME_VERSION_PINNING).length).toBe(Object.values(Game).length);
+    expect(GAME_VERSION_PINNING[Game.VALHEIM]).toBe("game-version");
+    expect(GAME_VERSION_PINNING[Game.ATS]).toBe("game-version");
+    expect(GAME_VERSION_PINNING[Game.FACTORIO]).toBe("image-tag");
+    expect(GAME_VERSION_PINNING[Game.TERRARIA]).toBe("image-tag");
+    expect(GAME_VERSION_PINNING[Game.RUST]).toBe("none");
+    expect(GAME_VERSION_PINNING[Game.ZOMBOID]).toBe("none");
+  });
+});
+
 describe("gameVersionValue", () => {
   it("keeps a valid version/branch token, falls back otherwise", async () => {
     const { gameVersionValue } = await import("./runtime-spec");

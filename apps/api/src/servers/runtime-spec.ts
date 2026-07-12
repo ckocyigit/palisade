@@ -108,6 +108,16 @@ export function gameVersionValue(raw: unknown, fallback: string): string {
 }
 
 /**
+ * ich777 GAME_ID with an optional Steam beta branch. The wrapper installs the default
+ * "public" branch from "<appid>", or a specific version/beta from "<appid> -beta <branch>"
+ * (per the image docs). Used by the truck sims + LiF, whose game version is a Steam branch.
+ */
+export function ich777GameId(appId: number, branch: unknown): string {
+  const b = gameVersionValue(branch, "public");
+  return b && b !== "public" ? `${appId} -beta ${b}` : `${appId}`;
+}
+
+/**
  * The POK images (ASA + Conan, both Acekorneya) run `sudo` in their entrypoints,
  * and sudo refuses to run under no-new-privileges EVEN AS ROOT (it checks the
  * flag explicitly) — the container dies before printing a line. gosu/su-based
@@ -1539,7 +1549,8 @@ function buildLifSpec(input: RuntimeSpecInput): Docker.ContainerCreateOptions {
 
   const lifEnv = [
     `TZ=${input.timezone || env.TZ}`,
-    `GAME_ID=${STEAM_APP_ID_LIF}`,
+    // Pinnable via the STEAM_BRANCH setting (default "public"): dx9-legacy / vanilla-1.3.6 / …
+    `GAME_ID=${ich777GameId(STEAM_APP_ID_LIF, input.config.values?.["STEAM_BRANCH"])}`,
     `GAME_PARAMS=-world 1`, // matches config/world_1.xml
     `UID=${env.PUID}`,
     `GID=${env.PGID}`,
@@ -2047,7 +2058,8 @@ function buildAtsSpec(input: RuntimeSpecInput): Docker.ContainerCreateOptions {
 
   const atsEnv = [
     `TZ=${input.timezone || env.TZ}`,
-    `GAME_ID=${input.game === Game.ATS ? 2239530 : 1948160}`,
+    // Pinnable via the STEAM_BRANCH setting (default "public") → a specific game version.
+    `GAME_ID=${ich777GameId(input.game === Game.ATS ? 2239530 : 1948160, input.config.values?.["STEAM_BRANCH"])}`,
     `GAME_PARAMS=`,
     `UID=${env.PUID}`,
     `GID=${env.PGID}`,
@@ -2199,6 +2211,7 @@ export function patchAtsServerConfig(
 
   for (const def of input.catalog.settings) {
     if (def.target !== SettingTarget.Env) continue;
+    if (def.noEmit) continue; // e.g. STEAM_BRANCH → GAME_ID, not a server_config.sii key
     const raw = input.config.values?.[def.key] ?? def.default;
     if (raw === undefined || raw === null) continue;
     const rendered =
@@ -2241,6 +2254,7 @@ export function patchLifWorldXml(
 
   for (const def of input.catalog.settings) {
     if (def.target !== SettingTarget.Env) continue;
+    if (def.noEmit) continue; // e.g. STEAM_BRANCH → GAME_ID, not a world_1.xml tag
     const raw = input.config.values?.[def.key] ?? def.default;
     if (raw === undefined || raw === null || raw === "") continue;
     const value = typeof raw === "boolean" ? (raw ? 1 : 0) : raw;

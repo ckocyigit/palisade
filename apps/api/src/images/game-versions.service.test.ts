@@ -44,6 +44,27 @@ describe("GameVersionsService", () => {
     expect(r.options.find((o) => o.value === "15.3")?.label).toMatch(/15\.3 — 2026-04-04/);
   });
 
+  it("parses ich777 Steam branches: public is the default, betas sorted newest-first, pwd branches dropped", async () => {
+    stub({
+      data: {
+        "2239530": {
+          depots: {
+            branches: {
+              public: { pwdrequired: "0", timeupdated: "100" },
+              public_beta: { description: "Public Beta", pwdrequired: "0", timeupdated: "200" },
+              temporary_1_59: { description: "1.59.x", pwdrequired: "0", timeupdated: "300" },
+              secret: { description: "locked", pwdrequired: "1", timeupdated: "400" },
+            },
+          },
+        },
+      },
+    });
+    const r = await new GameVersionsService().list(Game.ATS);
+    expect(r.defaultValue).toBe("public");
+    expect(r.options.map((o) => o.value)).toEqual(["temporary_1_59", "public_beta"]); // newest first, no public, no pwd
+    expect(r.options[0]?.label).toBe("temporary_1_59 — 1.59.x");
+  });
+
   it("returns an empty list for a game with no version provider", async () => {
     const r = await new GameVersionsService().list(Game.ASA);
     expect(r.options).toEqual([]);

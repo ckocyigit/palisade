@@ -122,6 +122,7 @@ const CONAN_GROUPS: SettingGroup[] = [
 
 // Palworld's catalog categories → their own tabs.
 const PALWORLD_GROUPS: SettingGroup[] = [
+  { id: "version", label: "Version", Icon: GitBranch, cats: ["Version"] },
   { id: "general", label: "General", Icon: SlidersHorizontal, cats: ["General", "PvP & Rules"] },
   { id: "rates", label: "Rates & World", Icon: Gauge, cats: ["Progression", "World"] },
   { id: "combat", label: "Combat & Survival", Icon: Swords, cats: ["Combat", "Survival"] },
@@ -153,6 +154,7 @@ const BEDROCK_GROUPS: SettingGroup[] = [
 
 // Valheim's env-driven catalog + launch-flag world modifiers → its own tabs.
 const VALHEIM_GROUPS: SettingGroup[] = [
+  { id: "version", label: "Version", Icon: GitBranch, cats: ["Version"] },
   { id: "world", label: "World", Icon: MapIcon, cats: ["World"] },
   { id: "server", label: "Server", Icon: SlidersHorizontal, cats: ["Server"] },
   { id: "modifiers", label: "World modifiers", Icon: Swords, cats: ["World modifiers"] },

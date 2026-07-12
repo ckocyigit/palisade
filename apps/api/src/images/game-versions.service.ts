@@ -21,6 +21,10 @@ export class GameVersionsService {
   private readonly providers: Partial<Record<Game, () => Promise<GameVersionsResult>>> = {
     [Game.MINECRAFT]: () => this.minecraft(),
     [Game.OPENTTD]: () => this.openttd(),
+    // ich777 SteamCMD games: the game version is a Steam beta branch appended to GAME_ID.
+    [Game.ATS]: () => this.steamBranches(2239530),
+    [Game.ETS2]: () => this.steamBranches(1948160),
+    [Game.LIF]: () => this.steamBranches(320850),
   };
 
   async list(game: Game): Promise<GameVersionsResult> {
@@ -82,6 +86,30 @@ export class GameVersionsService {
       defaultLabel: "Latest stable (latest)",
       options: options.filter((o) => o.value),
     };
+  }
+
+  /**
+   * Steam beta branches for an ich777 SteamCMD game (via api.steamcmd.net). "public"
+   * is the default (current release); other password-free branches become options —
+   * for the truck sims these are per-version (temporary_1_59 = 1.59.x). The chosen
+   * value is appended to GAME_ID as "-beta <branch>" in the spec builder.
+   */
+  private async steamBranches(appId: number): Promise<GameVersionsResult> {
+    const json = (await this.getJson(`https://api.steamcmd.net/v1/info/${appId}`)) as {
+      data?: Record<string, { depots?: { branches?: Record<string, { description?: string; pwdrequired?: string; timeupdated?: string }> } }>;
+    } | null;
+    const branches = json?.data?.[String(appId)]?.depots?.branches ?? {};
+    const options = Object.entries(branches)
+      // Skip the default (offered as defaultValue) + any password-protected branch.
+      .filter(([name, b]) => name !== "public" && String(b?.pwdrequired ?? "0") !== "1")
+      // Newest branch first where Steam gives us a timestamp.
+      .sort(([, a], [, b]) => Number(b?.timeupdated ?? 0) - Number(a?.timeupdated ?? 0))
+      .map<GameVersionOption>(([name, b]) => ({
+        value: name,
+        label: b?.description ? `${name} — ${b.description}` : name,
+        kind: "branch",
+      }));
+    return { defaultValue: "public", defaultLabel: "Public (current release)", options };
   }
 
   private async getJson(url: string): Promise<unknown> {

@@ -1,7 +1,13 @@
 "use client";
 import { useEffect, useState } from "react";
 import { Boxes, Save, Check, ChevronDown, Loader2 } from "lucide-react";
-import { ServerState, type ImageTagsResult, type ServerSummary } from "@ark/shared";
+import {
+  ServerState,
+  GAME_VERSION_PINNING,
+  GAME_LABELS,
+  type ImageTagsResult,
+  type ServerSummary,
+} from "@ark/shared";
 import { apiGet, apiPatch } from "@/lib/api";
 
 /**
@@ -77,6 +83,33 @@ export function ImageVersionCard({ server, onSaved }: { server: ServerSummary; o
             default (<span className="font-mono">{data?.defaultTag ?? "…"}</span>) — useful to roll back a
             bad update. Applied on the next start (the image is pulled and the container recreated).
           </p>
+          {/* Per-game: make clear whether the image tag == the game version. */}
+          {(() => {
+            const kind = GAME_VERSION_PINNING[server.game];
+            const label = GAME_LABELS[server.game];
+            if (kind === "image-tag") {
+              return (
+                <p className="rounded-md border border-emerald-900/40 bg-emerald-950/20 px-2.5 py-1.5 text-[11px] leading-snug text-emerald-200/90">
+                  For {label}, the image tag <span className="font-semibold">is</span> the game version — pick a
+                  version here to change the game itself.
+                </p>
+              );
+            }
+            if (kind === "game-version") {
+              return (
+                <p className="rounded-md border border-sky-900/40 bg-sky-950/20 px-2.5 py-1.5 text-[11px] leading-snug text-sky-200/90">
+                  This changes the management image (its runtime/wrapper), <span className="font-semibold">not</span>{" "}
+                  the game version. Set {label}&apos;s game version in the <span className="font-semibold">Settings</span> tab.
+                </p>
+              );
+            }
+            return (
+              <p className="rounded-md border border-amber-900/40 bg-amber-950/20 px-2.5 py-1.5 text-[11px] leading-snug text-amber-200/90">
+                {label}&apos;s game version can&apos;t be pinned — the image always installs the latest version
+                on start. This dropdown changes the management image only.
+              </p>
+            );
+          })()}
           {err && <div className="text-xs text-rose-300">{err}</div>}
 
           <div className="flex flex-wrap items-center gap-2">
