@@ -7,6 +7,7 @@ import {
   type ServerConfigValues,
   type SettingsCatalog,
   type MotdValue,
+  type EnvVar,
 } from "@ark/shared";
 import { buildCustomArgs, isBattlEyeDisabled } from "../catalog/command-line";
 import { VALHEIM_MODIFIER_CATEGORY } from "../catalog/valheim.catalog";
@@ -83,6 +84,9 @@ export interface RuntimeSpecInput {
   /** Advanced: pin the game image to a specific tag (e.g. a prior version) instead of
    *  the shipped default. Invalid/blank falls back to the default tag. */
   imageTag?: string | null;
+  /** User-defined extra env vars to inject into the container (appended last so they
+   *  can override any built-in variable). */
+  extraEnv?: EnvVar[];
 }
 
 /** Build the Docker create spec for a game-server container. */
@@ -91,6 +95,13 @@ export function buildContainerSpec(input: RuntimeSpecInput): Docker.ContainerCre
   // Each game spec sets Image to its shipped default; apply a pinned tag here (one
   // choke point) so an advanced user can run a specific version.
   spec.Image = imageRefFor(input.game, input.imageTag);
+  // Append user-defined extra env vars last so they can override any built-in key.
+  if (input.extraEnv && input.extraEnv.length > 0) {
+    spec.Env = [
+      ...(spec.Env ?? []),
+      ...input.extraEnv.map(({ key, value }) => `${key}=${value}`),
+    ];
+  }
   return spec;
 }
 
