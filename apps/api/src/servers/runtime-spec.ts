@@ -520,8 +520,11 @@ function buildPalworldSpec(input: RuntimeSpecInput): Docker.ContainerCreateOptio
     `PLAYERS=${input.maxPlayers}`,
     `MULTITHREADING=true`,
     // The manager owns updates/backups/restarts — turn off the image's own loops.
+    // Exception: when TARGET_MANIFEST_ID is set via extraEnv we must let SteamCMD
+    // run (UPDATE_ON_BOOT=true) so it can download the pinned manifest. Without it
+    // the manifest ID env var is present but completely ignored by the image.
     // (A fresh instance still installs on first boot regardless of UPDATE_ON_BOOT.)
-    `UPDATE_ON_BOOT=false`,
+    `UPDATE_ON_BOOT=${(input.extraEnv ?? []).some((e) => e.key === "TARGET_MANIFEST_ID") ? "true" : "false"}`,
     `BACKUP_ENABLED=false`,
     `AUTO_REBOOT_ENABLED=false`,
     // NOTE: the UE4SS mod framework is NOT preloaded via a container-wide LD_PRELOAD.
@@ -624,7 +627,9 @@ function buildPalworldWineSpec(input: RuntimeSpecInput): Docker.ContainerCreateO
     `MAX_PLAYERS=${input.maxPlayers}`,
     `MULTITHREAD_ENABLED=true`,
     // The manager owns updates/backups/restarts — silence the image's own loops.
-    `ALWAYS_UPDATE_ON_START=false`,
+    // Exception: when TARGET_MANIFEST_ID is set via extraEnv we must let SteamCMD
+    // run so it can download the pinned manifest.
+    `ALWAYS_UPDATE_ON_START=${(input.extraEnv ?? []).some((e) => e.key === "TARGET_MANIFEST_ID") ? "true" : "false"}`,
     `BACKUP_ENABLED=false`,
     `RESTART_ENABLED=false`,
     ...palworldCatalogEnv(input, "true"),
